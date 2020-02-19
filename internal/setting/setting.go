@@ -16,18 +16,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/unknwon/com"
 	_ "github.com/go-macaron/cache/memcache"
 	_ "github.com/go-macaron/cache/redis"
 	"github.com/go-macaron/session"
 	_ "github.com/go-macaron/session/redis"
 	"github.com/mcuadros/go-version"
+	"github.com/unknwon/com"
 	log "gopkg.in/clog.v1"
 	"gopkg.in/ini.v1"
 
 	"github.com/gogs/go-libravatar"
 
-	"gogs.io/gogs/internal/bindata"
+	"gogs.io/gogs/internal/assets/conf"
 	"gogs.io/gogs/internal/process"
 	"gogs.io/gogs/internal/user"
 )
@@ -50,11 +50,11 @@ const (
 
 var (
 	// Build information should only be set by -ldflags.
-	BuildTime    string
-	BuildGitHash string
+	BuildTime   string
+	BuildCommit string
 
 	// App settings
-	AppVer         string
+	AppVersion     string
 	AppName        string
 	AppURL         string
 	AppSubURL      string
@@ -74,6 +74,7 @@ var (
 	CertFile             string
 	KeyFile              string
 	TLSMinVersion        string
+	LoadAssetsFromDisk   bool
 	StaticRootPath       string
 	EnableGzip           bool
 	LandingPageURL       LandingPage
@@ -416,7 +417,7 @@ func NewContext() {
 
 	Cfg, err = ini.LoadSources(ini.LoadOptions{
 		IgnoreInlineComment: true,
-	}, bindata.MustAsset("conf/app.ini"))
+	}, conf.MustAsset("conf/app.ini"))
 	if err != nil {
 		log.Fatal(2, "Fail to parse 'conf/app.ini': %v", err)
 	}
@@ -489,6 +490,7 @@ func NewContext() {
 	LocalURL = sec.Key("LOCAL_ROOT_URL").MustString(string(Protocol) + "://localhost:" + HTTPPort + "/")
 	OfflineMode = sec.Key("OFFLINE_MODE").MustBool()
 	DisableRouterLog = sec.Key("DISABLE_ROUTER_LOG").MustBool()
+	LoadAssetsFromDisk = sec.Key("LOAD_ASSETS_FROM_DISK").MustBool()
 	StaticRootPath = sec.Key("STATIC_ROOT_PATH").MustString(workDir)
 	AppDataPath = sec.Key("APP_DATA_PATH").MustString("data")
 	EnableGzip = sec.Key("ENABLE_GZIP").MustBool()
@@ -729,8 +731,8 @@ func newService() {
 
 func newLogService() {
 	if len(BuildTime) > 0 {
-		log.Trace("Build Time: %s", BuildTime)
-		log.Trace("Build Git Hash: %s", BuildGitHash)
+		log.Trace("Build time: %s", BuildTime)
+		log.Trace("Build commit: %s", BuildCommit)
 	}
 
 	// Because we always create a console logger as primary logger before all settings are loaded,
@@ -809,11 +811,11 @@ func newLogService() {
 		}
 
 		log.New(log.MODE(mode), LogConfigs[i])
-		log.Trace("Log Mode: %s (%s)", strings.Title(mode), strings.Title(name))
+		log.Trace("Log mode: %s (%s)", strings.Title(mode), strings.Title(name))
 	}
 
 	// Make sure everyone gets version info printed.
-	log.Info("%s %s", AppName, AppVer)
+	log.Info("%s %s", AppName, AppVersion)
 	if !hasConsole {
 		log.Delete(log.CONSOLE)
 	}
@@ -830,7 +832,7 @@ func newCacheService() {
 		log.Fatal(2, "Unknown cache adapter: %s", CacheAdapter)
 	}
 
-	log.Info("Cache Service Enabled")
+	log.Trace("Cache service is enabled")
 }
 
 func newSessionService() {
@@ -844,7 +846,7 @@ func newSessionService() {
 	SessionConfig.Maxlifetime = Cfg.Section("session").Key("SESSION_LIFE_TIME").MustInt64(86400)
 	CSRFCookieName = Cfg.Section("session").Key("CSRF_COOKIE_NAME").MustString("_csrf")
 
-	log.Info("Session Service Enabled")
+	log.Trace("Session service is enabled")
 }
 
 // Mailer represents mail service.
@@ -904,18 +906,18 @@ func newMailService() {
 	if HookMode {
 		return
 	}
-	log.Info("Mail Service Enabled")
+	log.Trace("Mail service is enabled")
 }
 
 func newRegisterMailService() {
 	if !Cfg.Section("service").Key("REGISTER_EMAIL_CONFIRM").MustBool() {
 		return
 	} else if MailService == nil {
-		log.Warn("Register Mail Service: Mail Service is not enabled")
+		log.Warn("Email confirmation is not enabled due to the mail service is not available")
 		return
 	}
 	Service.RegisterEmailConfirm = true
-	log.Info("Register Mail Service Enabled")
+	log.Trace("Email confirmation is enabled")
 }
 
 // newNotifyMailService initializes notification email service options from configuration.
@@ -924,7 +926,7 @@ func newNotifyMailService() {
 	if !Cfg.Section("service").Key("ENABLE_NOTIFY_MAIL").MustBool() {
 		return
 	} else if MailService == nil {
-		log.Warn("Notify Mail Service: Mail Service is not enabled")
+		log.Warn("Email notification is not enabled due to the mail service is not available")
 		return
 	}
 	Service.EnableNotifyMail = true
@@ -932,7 +934,7 @@ func newNotifyMailService() {
 	if HookMode {
 		return
 	}
-	log.Info("Notify Mail Service Enabled")
+	log.Trace("Email notification is enabled")
 }
 
 func NewService() {
