@@ -116,6 +116,29 @@
 					{{end}}
 				</div>
 			</div>
-		</div>
+
+      <div class="ui divider"></div>
+
+			<input id="assignee_id" name="assignee_id" type="hidden" value="{{.assignee_id}}">
+			<div class="ui {{if not .Assignees}}disabled{{end}} floating jump select-assignee dropdown">
+				<span class="text">
+					<strong>{{.i18n.Tr "repo.issues.new.weight"}}</strong>
+					<span class="octicon octicon-gear"></span>
+				</span>
+				<div class="menu">
+					<div class="no-select item">{{.i18n.Tr "repo.issues.new.clear_weight"}}</div>
+					{{range .Assignees}}
+						<div class="item" data-id="{{.ID}}" data-href="{{$.RepoLink}}/issues?assignee={{.ID}}" data-avatar="{{.RelAvatarLink}}"><img src="{{.RelAvatarLink}}"> {{.Name}}</div>
+					{{end}}
+				</div>
+			</div>
+			<div class="ui select-assignee list">
+				<span class="no-select item {{if .Assignee}}hide{{end}}">{{.i18n.Tr "repo.issues.new.no_weight"}}</span>
+				<div class="selected">
+					{{if .Assignee}}
+						<a class="item" href="{{.RepoLink}}/issues?assignee={{.Assignee.ID}}"><img class="ui avatar image" src="{{.Assignee.RelAvatarLink}}"> {{.Assignee.Name}}</a>
+					{{end}}
+				</div>
+			</div>
 	</div>
 </form>

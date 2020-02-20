@@ -52,6 +52,20 @@
 				</div>
 			</div>
 
+			<!-- Weight -->
+			<div class="ui {{if not .Milestones}}disabled{{end}} dropdown jump item">
+				<span class="text">
+					{{.i18n.Tr "repo.issues.filter_weight"}}
+					<i class="dropdown icon"></i>
+				</span>
+				<div class="menu">
+					<a class="item" href="{{$.Link}}?type={{$.ViewType}}&sort={{$.SortType}}&state={{$.State}}&labels={{.SelectLabels}}&assignee={{$.AssigneeID}}">{{.i18n.Tr "repo.issues.filter_weight_no_select"}}</a>
+					{{range .Milestones}}
+						<a class="{{if eq $.MilestoneID .ID}}active selected{{end}} item" href="{{$.Link}}?type={{$.ViewType}}&sort={{$.SortType}}&state={{$.State}}&labels={{$.SelectLabels}}&milestone={{.ID}}&assignee={{$.AssigneeID}}">{{.Name | Sanitize}}</a>
+					{{end}}
+				</div>
+			</div>
+
 			<!-- Assignee -->
 			<div class="ui {{if not .Assignees}}disabled{{end}} dropdown jump item">
 				<span class="text">
@@ -89,6 +103,7 @@
 				<div class="menu">
 					<a class="{{if or (eq .SortType "latest") (not .SortType)}}active{{end}} item" href="{{$.Link}}?type={{$.ViewType}}&sort=latest&state={{$.State}}&labels={{.SelectLabels}}&milestone={{$.MilestoneID}}&assignee={{$.AssigneeID}}">{{.i18n.Tr "repo.issues.filter_sort.latest"}}</a>
 					<a class="{{if eq .SortType "oldest"}}active{{end}} item" href="{{$.Link}}?type={{$.ViewType}}&sort=oldest&state={{$.State}}&labels={{.SelectLabels}}&milestone={{$.MilestoneID}}&assignee={{$.AssigneeID}}">{{.i18n.Tr "repo.issues.filter_sort.oldest"}}</a>
+					<a class="{{if eq .SortType "oldest"}}active{{end}} item" href="{{$.Link}}?type={{$.ViewType}}&sort=oldest&state={{$.State}}&labels={{.SelectLabels}}&milestone={{$.MilestoneID}}&assignee={{$.AssigneeID}}">Weight<!--{{.i18n.Tr "repo.issues.filter_sort.oldest"}}--></a>
 					<a class="{{if eq .SortType "recentupdate"}}active{{end}} item" href="{{$.Link}}?type={{$.ViewType}}&sort=recentupdate&state={{$.State}}&labels={{.SelectLabels}}&milestone={{$.MilestoneID}}&assignee={{$.AssigneeID}}">{{.i18n.Tr "repo.issues.filter_sort.recentupdate"}}</a>
 					<a class="{{if eq .SortType "leastupdate"}}active{{end}} item" href="{{$.Link}}?type={{$.ViewType}}&sort=leastupdate&state={{$.State}}&labels={{.SelectLabels}}&milestone={{$.MilestoneID}}&assignee={{$.AssigneeID}}">{{.i18n.Tr "repo.issues.filter_sort.leastupdate"}}</a>
 					<a class="{{if eq .SortType "mostcomment"}}active{{end}} item" href="{{$.Link}}?type={{$.ViewType}}&sort=mostcomment&state={{$.State}}&labels={{.SelectLabels}}&milestone={{$.MilestoneID}}&assignee={{$.AssigneeID}}">{{.i18n.Tr "repo.issues.filter_sort.mostcomment"}}</a>
@@ -117,6 +132,11 @@
 						{{if .Milestone}}
 							<a class="milestone" href="{{$.Link}}?type={{$.ViewType}}&state={{$.State}}&labels={{$.SelectLabels}}&milestone={{.Milestone.ID}}&assignee={{$.AssigneeID}}">
 								<span class="octicon octicon-milestone"></span> {{.Milestone.Name | Sanitize}}
+							</a>
+						{{end}}
+						{{if .Milestone}}
+							<a class="milestone" href="{{$.Link}}?type={{$.ViewType}}&state={{$.State}}&labels={{$.SelectLabels}}&milestone={{.Milestone.ID}}&assignee={{$.AssigneeID}}">
+								<span class="octicon octicon-law"></span> {{.Milestone.Name | Sanitize}}
 							</a>
 						{{end}}
 						{{if .Assignee}}
