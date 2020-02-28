@@ -2,22 +2,22 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-package mailer
+package email
 
 import (
 	"fmt"
 	"html/template"
-	"path"
+	"path/filepath"
 	"sync"
 	"time"
 
-	log "gopkg.in/clog.v1"
 	"gopkg.in/gomail.v2"
 	"gopkg.in/macaron.v1"
+	log "unknwon.dev/clog/v2"
 
 	"gogs.io/gogs/internal/assets/templates"
+	"gogs.io/gogs/internal/conf"
 	"gogs.io/gogs/internal/markup"
-	"gogs.io/gogs/internal/setting"
 )
 
 const (
@@ -41,15 +41,15 @@ var (
 func render(tpl string, data map[string]interface{}) (string, error) {
 	tplRenderOnce.Do(func() {
 		opt := &macaron.RenderOptions{
-			Directory:         path.Join(setting.StaticRootPath, "templates/mail"),
-			AppendDirectories: []string{path.Join(setting.CustomPath, "templates/mail")},
+			Directory:         filepath.Join(conf.WorkDir(), "templates", "mail"),
+			AppendDirectories: []string{filepath.Join(conf.CustomDir(), "templates", "mail")},
 			Extensions:        []string{".tmpl", ".html"},
 			Funcs: []template.FuncMap{map[string]interface{}{
 				"AppName": func() string {
-					return setting.AppName
+					return conf.App.BrandName
 				},
 				"AppURL": func() string {
-					return setting.AppURL
+					return conf.Server.ExternalURL
 				},
 				"Year": func() int {
 					return time.Now().Year()
@@ -59,7 +59,7 @@ func render(tpl string, data map[string]interface{}) (string, error) {
 				},
 			}},
 		}
-		if !setting.LoadAssetsFromDisk {
+		if !conf.Server.LoadAssetsFromDisk {
 			opt.TemplateFileSystem = templates.NewTemplateFileSystem("mail", opt.AppendDirectories[0])
 		}
 
@@ -105,13 +105,13 @@ type Issue interface {
 func SendUserMail(c *macaron.Context, u User, tpl, code, subject, info string) {
 	data := map[string]interface{}{
 		"Username":          u.DisplayName(),
-		"ActiveCodeLives":   setting.Service.ActiveCodeLives / 60,
-		"ResetPwdCodeLives": setting.Service.ResetPwdCodeLives / 60,
+		"ActiveCodeLives":   conf.Auth.ActivateCodeLives / 60,
+		"ResetPwdCodeLives": conf.Auth.ResetPasswordCodeLives / 60,
 		"Code":              code,
 	}
 	body, err := render(tpl, data)
 	if err != nil {
-		log.Error(2, "render: %v", err)
+		log.Error("render: %v", err)
 		return
 	}
 
@@ -133,13 +133,13 @@ func SendResetPasswordMail(c *macaron.Context, u User) {
 func SendActivateEmailMail(c *macaron.Context, u User, email string) {
 	data := map[string]interface{}{
 		"Username":        u.DisplayName(),
-		"ActiveCodeLives": setting.Service.ActiveCodeLives / 60,
+		"ActiveCodeLives": conf.Auth.ActivateCodeLives / 60,
 		"Code":            u.GenerateEmailActivateCode(email),
 		"Email":           email,
 	}
 	body, err := render(MAIL_AUTH_ACTIVATE_EMAIL, data)
 	if err != nil {
-		log.Error(3, "HTMLString: %v", err)
+		log.Error("HTMLString: %v", err)
 		return
 	}
 
@@ -156,7 +156,7 @@ func SendRegisterNotifyMail(c *macaron.Context, u User) {
 	}
 	body, err := render(MAIL_AUTH_REGISTER_NOTIFY, data)
 	if err != nil {
-		log.Error(3, "HTMLString: %v", err)
+		log.Error("HTMLString: %v", err)
 		return
 	}
 
@@ -177,7 +177,7 @@ func SendCollaboratorMail(u, doer User, repo Repository) {
 	}
 	body, err := render(MAIL_NOTIFY_COLLABORATOR, data)
 	if err != nil {
-		log.Error(3, "HTMLString: %v", err)
+		log.Error("HTMLString: %v", err)
 		return
 	}
 
@@ -202,9 +202,9 @@ func composeIssueMessage(issue Issue, repo Repository, doer User, tplName string
 	data["Doer"] = doer
 	content, err := render(tplName, data)
 	if err != nil {
-		log.Error(3, "HTMLString (%s): %v", tplName, err)
+		log.Error("HTMLString (%s): %v", tplName, err)
 	}
-	from := gomail.NewMessage().FormatAddress(setting.MailService.FromEmail, doer.DisplayName())
+	from := gomail.NewMessage().FormatAddress(conf.Email.FromEmail, doer.DisplayName())
 	msg := NewMessageFrom(tos, from, subject, content)
 	msg.Info = fmt.Sprintf("Subject: %s, %s", subject, info)
 	return msg

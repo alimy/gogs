@@ -1,5 +1,5 @@
-LDFLAGS += -X "gogs.io/gogs/internal/setting.BuildTime=$(shell date -u '+%Y-%m-%d %I:%M:%S %Z')"
-LDFLAGS += -X "gogs.io/gogs/internal/setting.BuildCommit=$(shell git rev-parse HEAD)"
+LDFLAGS += -X "gogs.io/gogs/internal/conf.BuildTime=$(shell date -u '+%Y-%m-%d %I:%M:%S %Z')"
+LDFLAGS += -X "gogs.io/gogs/internal/conf.BuildCommit=$(shell git rev-parse HEAD)"
 
 CONF_FILES := $(shell find conf | sed 's/ /\\ /g')
 TEMPLATES_FILES := $(shell find templates | sed 's/ /\\ /g')
@@ -71,21 +71,18 @@ less: public/css/gogs.css
 public/css/gogs.css: $(LESS_FILES)
 	@type lessc >/dev/null 2>&1 && lessc --source-map "public/less/gogs.less" $@ || echo "lessc command not found or failed"
 
-clean:
-	go clean -i ./...
-
-clean-mac: clean
-	find . -name ".DS_Store" -print0 | xargs -0 rm
+clean-mac:
+	find . -name "*.DS_Store" -type f -delete
 
 test:
 	go test -cover -race ./...
 
 fixme:
-	grep -rnw "FIXME" cmd routers models pkg
+	grep -rnw "FIXME" internal
 
 todo:
-	grep -rnw "TODO" cmd routers models pkg
+	grep -rnw "TODO" internal
 
 # Legacy code should be remove by the time of release
 legacy:
-	grep -rnw "LEGACY" cmd routes models pkg
+	grep -rnw "\(LEGACY\|DEPRECATED\)" internal

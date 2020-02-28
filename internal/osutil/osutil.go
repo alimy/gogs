@@ -16,3 +16,19 @@ func IsFile(path string) bool {
 	}
 	return !f.IsDir()
 }
+
+// IsExist returns true if a file or directory exists.
+func IsExist(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil || os.IsExist(err)
+}
+
+// CurrentUsername returns the current system user via environment variables.
+func CurrentUsername() string {
+	curUserName := os.Getenv("USER")
+	if len(curUserName) > 0 {
+		return curUserName
+	}
+
+	return os.Getenv("USERNAME")
+}

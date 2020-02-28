@@ -16,14 +16,14 @@ import (
 	"strings"
 	"time"
 
-	log "gopkg.in/clog.v1"
 	"gopkg.in/macaron.v1"
+	log "unknwon.dev/clog/v2"
 
+	"gogs.io/gogs/internal/conf"
 	"gogs.io/gogs/internal/context"
 	"gogs.io/gogs/internal/db"
 	"gogs.io/gogs/internal/db/errors"
 	"gogs.io/gogs/internal/lazyregexp"
-	"gogs.io/gogs/internal/setting"
 	"gogs.io/gogs/internal/tool"
 )
 
@@ -44,9 +44,9 @@ func askCredentials(c *context.Context, status int, text string) {
 
 func HTTPContexter() macaron.Handler {
 	return func(c *context.Context) {
-		if len(setting.HTTP.AccessControlAllowOrigin) > 0 {
+		if len(conf.HTTP.AccessControlAllowOrigin) > 0 {
 			// Set CORS headers for browser-based git clients
-			c.Resp.Header().Set("Access-Control-Allow-Origin", setting.HTTP.AccessControlAllowOrigin)
+			c.Resp.Header().Set("Access-Control-Allow-Origin", conf.HTTP.AccessControlAllowOrigin)
 			c.Resp.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, User-Agent")
 
 			// Handle preflight OPTIONS request
@@ -77,7 +77,7 @@ func HTTPContexter() macaron.Handler {
 		}
 
 		// Authentication is not required for pulling from public repositories.
-		if isPull && !repo.IsPrivate && !setting.Service.RequireSignInView {
+		if isPull && !repo.IsPrivate && !conf.Auth.RequireSigninView {
 			c.Map(&HTTPContext{
 				Context: c,
 			})
@@ -235,7 +235,7 @@ func serviceRPC(h serviceHandler, service string) {
 	if h.r.Header.Get("Content-Encoding") == "gzip" {
 		reqBody, err = gzip.NewReader(reqBody)
 		if err != nil {
-			log.Error(2, "HTTP.Get: fail to create gzip reader: %v", err)
+			log.Error("HTTP.Get: fail to create gzip reader: %v", err)
 			h.w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -258,7 +258,7 @@ func serviceRPC(h serviceHandler, service string) {
 	cmd.Stderr = &stderr
 	cmd.Stdin = reqBody
 	if err = cmd.Run(); err != nil {
-		log.Error(2, "HTTP.serviceRPC: fail to serve RPC '%s': %v - %s", service, err, stderr.String())
+		log.Error("HTTP.serviceRPC: fail to serve RPC '%s': %v - %s", service, err, stderr.String())
 		h.w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -286,7 +286,7 @@ func gitCommand(dir string, args ...string) []byte {
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {
-		log.Error(2, fmt.Sprintf("Git: %v - %s", err, out))
+		log.Error(fmt.Sprintf("Git: %v - %s", err, out))
 	}
 	return out
 }
@@ -368,7 +368,7 @@ func getGitRepoPath(dir string) (string, error) {
 		dir += ".git"
 	}
 
-	filename := path.Join(setting.RepoRootPath, dir)
+	filename := path.Join(conf.Repository.Root, dir)
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
 		return "", err
 	}
@@ -387,7 +387,7 @@ func HTTP(c *HTTPContext) {
 		// We perform check here because route matched in cmd/web.go is wider than needed,
 		// but we only want to output this message only if user is really trying to access
 		// Git HTTP endpoints.
-		if setting.Repository.DisableHTTPGit {
+		if conf.Repository.DisableHTTPGit {
 			c.HandleText(http.StatusForbidden, "Interacting with repositories by HTTP protocol is not disabled")
 			return
 		}

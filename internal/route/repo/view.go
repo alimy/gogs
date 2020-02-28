@@ -13,14 +13,14 @@ import (
 	"strings"
 
 	"github.com/unknwon/paginater"
-	log "gopkg.in/clog.v1"
+	log "unknwon.dev/clog/v2"
 
 	"github.com/gogs/git-module"
 
 	"gogs.io/gogs/internal/context"
 	"gogs.io/gogs/internal/db"
 	"gogs.io/gogs/internal/markup"
-	"gogs.io/gogs/internal/setting"
+	"gogs.io/gogs/internal/conf"
 	"gogs.io/gogs/internal/template"
 	"gogs.io/gogs/internal/template/highlight"
 	"gogs.io/gogs/internal/tool"
@@ -47,7 +47,7 @@ func renderDirectory(c *context.Context, treeLink string) {
 	}
 	entries.Sort()
 
-	c.Data["Files"], err = entries.GetCommitsInfoWithCustomConcurrency(c.Repo.Commit, c.Repo.TreePath, setting.Repository.CommitsFetchConcurrency)
+	c.Data["Files"], err = entries.GetCommitsInfoWithCustomConcurrency(c.Repo.Commit, c.Repo.TreePath, conf.Repository.CommitsFetchConcurrency)
 	if err != nil {
 		c.ServerError("GetCommitsInfoWithCustomConcurrency", err)
 		return
@@ -118,7 +118,7 @@ func renderDirectory(c *context.Context, treeLink string) {
 
 	if c.Repo.CanEnableEditor() {
 		c.Data["CanAddFile"] = true
-		c.Data["CanUploadFile"] = setting.Repository.Upload.Enabled
+		c.Data["CanUploadFile"] = conf.Repository.Upload.Enabled
 	}
 }
 
@@ -152,7 +152,7 @@ func renderFile(c *context.Context, entry *git.TreeEntry, treeLink, rawLink stri
 	canEnableEditor := c.Repo.CanEnableEditor()
 	switch {
 	case isTextFile:
-		if blob.Size() >= setting.UI.MaxDisplayFileSize {
+		if blob.Size() >= conf.UI.MaxDisplayFileSize {
 			c.Data["IsFileTooLarge"] = true
 			break
 		}
@@ -176,7 +176,7 @@ func renderFile(c *context.Context, entry *git.TreeEntry, treeLink, rawLink stri
 			var fileContent string
 			if err, content := template.ToUTF8WithErr(buf); err != nil {
 				if err != nil {
-					log.Error(4, "ToUTF8WithErr: %s", err)
+					log.Error("ToUTF8WithErr: %s", err)
 				}
 				fileContent = string(buf)
 			} else {
@@ -186,7 +186,7 @@ func renderFile(c *context.Context, entry *git.TreeEntry, treeLink, rawLink stri
 			var output bytes.Buffer
 			lines := strings.Split(fileContent, "\n")
 			// Remove blank line at the end of file
-			if len(lines) > 0 && len(lines[len(lines)-1])==0 {
+			if len(lines) > 0 && len(lines[len(lines)-1]) == 0 {
 				lines = lines[:len(lines)-1]
 			}
 			for index, line := range lines {
