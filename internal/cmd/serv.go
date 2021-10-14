@@ -18,7 +18,6 @@ import (
 
 	"gogs.io/gogs/internal/conf"
 	"gogs.io/gogs/internal/db"
-	"gogs.io/gogs/internal/db/errors"
 )
 
 const (
@@ -35,20 +34,26 @@ var Serv = cli.Command{
 	},
 }
 
-func fail(userMessage, logMessage string, args ...interface{}) {
-	fmt.Fprintln(os.Stderr, "Gogs:", userMessage)
+// fail prints user message to the Git client (i.e. os.Stderr) and
+// logs error message on the server side. When not in "prod" mode,
+// error message is also printed to the client for easier debugging.
+func fail(userMessage, errMessage string, args ...interface{}) {
+	_, _ = fmt.Fprintln(os.Stderr, "Gogs:", userMessage)
 
-	if len(logMessage) > 0 {
+	if len(errMessage) > 0 {
 		if !conf.IsProdMode() {
-			fmt.Fprintf(os.Stderr, logMessage+"\n", args...)
+			fmt.Fprintf(os.Stderr, errMessage+"\n", args...)
 		}
-		log.Fatal(logMessage, args...)
+		log.Error(errMessage, args...)
 	}
 
+	log.Stop()
 	os.Exit(1)
 }
 
-func setup(c *cli.Context, logPath string, connectDB bool) {
+func setup(c *cli.Context, logFile string, connectDB bool) {
+	conf.HookMode = true
+
 	var customConf string
 	if c.IsSet("config") {
 		customConf = c.String("config")
@@ -60,6 +65,7 @@ func setup(c *cli.Context, logPath string, connectDB bool) {
 	if err != nil {
 		fail("Internal error", "Failed to init configuration: %v", err)
 	}
+	conf.InitLogging(true)
 
 	level := log.LevelTrace
 	if conf.IsProdMode() {
@@ -68,7 +74,7 @@ func setup(c *cli.Context, logPath string, connectDB bool) {
 
 	err = log.NewFile(log.FileConfig{
 		Level:    level,
-		Filename: filepath.Join(conf.LogRootPath, logPath),
+		Filename: filepath.Join(conf.Log.RootPath, "hooks", logFile),
 		FileRotationConfig: log.FileRotationConfig{
 			Rotate:  true,
 			Daily:   true,
@@ -88,7 +94,7 @@ func setup(c *cli.Context, logPath string, connectDB bool) {
 		_ = os.Chdir(conf.WorkDir())
 	}
 
-	if err := db.SetEngine(); err != nil {
+	if _, err := db.SetEngine(); err != nil {
 		fail("Internal error", "Failed to set database engine: %v", err)
 	}
 }
@@ -121,9 +127,9 @@ func checkDeployKey(key *db.PublicKey, repo *db.Repository) {
 
 var (
 	allowedCommands = map[string]db.AccessMode{
-		"git-upload-pack":    db.ACCESS_MODE_READ,
-		"git-upload-archive": db.ACCESS_MODE_READ,
-		"git-receive-pack":   db.ACCESS_MODE_WRITE,
+		"git-upload-pack":    db.AccessModeRead,
+		"git-upload-archive": db.AccessModeRead,
+		"git-receive-pack":   db.AccessModeWrite,
 	}
 )
 
@@ -158,7 +164,7 @@ func runServ(c *cli.Context) error {
 
 	owner, err := db.GetUserByName(ownerName)
 	if err != nil {
-		if errors.IsUserNotExist(err) {
+		if db.IsErrUserNotExist(err) {
 			fail("Repository owner does not exist", "Unregistered owner: %s", ownerName)
 		}
 		fail("Internal error", "Failed to get repository owner '%s': %v", ownerName, err)
@@ -166,7 +172,7 @@ func runServ(c *cli.Context) error {
 
 	repo, err := db.GetRepositoryByName(owner.ID, repoName)
 	if err != nil {
-		if errors.IsRepoNotExist(err) {
+		if db.IsErrRepoNotExist(err) {
 			fail(_ACCESS_DENIED_MESSAGE, "Repository does not exist: %s/%s", owner.Name, repoName)
 		}
 		fail("Internal error", "Failed to get repository: %v", err)
@@ -179,7 +185,7 @@ func runServ(c *cli.Context) error {
 	}
 
 	// Prohibit push to mirror repositories.
-	if requestMode > db.ACCESS_MODE_READ && repo.IsMirror {
+	if requestMode > db.AccessModeRead && repo.IsMirror {
 		fail("Mirror repository is read-only", "")
 	}
 
@@ -191,7 +197,7 @@ func runServ(c *cli.Context) error {
 		fail("Invalid key ID", "Invalid key ID '%s': %v", c.Args()[0], err)
 	}
 
-	if requestMode == db.ACCESS_MODE_WRITE || repo.IsPrivate {
+	if requestMode == db.AccessModeWrite || repo.IsPrivate {
 		// Check deploy key or user key.
 		if key.IsDeployKey() {
 			if key.Mode < requestMode {
@@ -204,14 +210,15 @@ func runServ(c *cli.Context) error {
 				fail("Internal error", "Failed to get user by key ID '%d': %v", key.ID, err)
 			}
 
-			mode, err := db.UserAccessMode(user.ID, repo)
-			if err != nil {
-				fail("Internal error", "Failed to check access: %v", err)
-			}
-
+			mode := db.Perms.AccessMode(user.ID, repo.ID,
+				db.AccessModeOptions{
+					OwnerID: repo.OwnerID,
+					Private: repo.IsPrivate,
+				},
+			)
 			if mode < requestMode {
 				clientMessage := _ACCESS_DENIED_MESSAGE
-				if mode >= db.ACCESS_MODE_READ {
+				if mode >= db.AccessModeRead {
 					clientMessage = "You do not have sufficient authorization for this action"
 				}
 				fail(clientMessage,
@@ -223,7 +230,7 @@ func runServ(c *cli.Context) error {
 		// Check if the key can access to the repository in case of it is a deploy key (a deploy keys != user key).
 		// A deploy key doesn't represent a signed in user, so in a site with Auth.RequireSignInView enabled,
 		// we should give read access only in repositories where this deploy key is in use. In other cases,
-		// a server or system using an active deploy key can get read access to all repositories on a Gogs instace.
+		// a server or system using an active deploy key can get read access to all repositories on a Gogs instance.
 		if key.IsDeployKey() && conf.Auth.RequireSigninView {
 			checkDeployKey(key, repo)
 		}
@@ -254,7 +261,7 @@ func runServ(c *cli.Context) error {
 	} else {
 		gitCmd = exec.Command(verb, repoFullName)
 	}
-	if requestMode == db.ACCESS_MODE_WRITE {
+	if requestMode == db.AccessModeWrite {
 		gitCmd.Env = append(os.Environ(), db.ComposeHookEnvs(db.ComposeHookEnvsOptions{
 			AuthUser:  user,
 			OwnerName: owner.Name,

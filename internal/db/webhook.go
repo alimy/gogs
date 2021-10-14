@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/json-iterator/go"
+	jsoniter "github.com/json-iterator/go"
 	gouuid "github.com/satori/go.uuid"
 	log "unknwon.dev/clog/v2"
 	"xorm.io/xorm"
@@ -22,12 +22,12 @@ import (
 	api "github.com/gogs/go-gogs-client"
 
 	"gogs.io/gogs/internal/conf"
-	"gogs.io/gogs/internal/db/errors"
+	"gogs.io/gogs/internal/errutil"
 	"gogs.io/gogs/internal/httplib"
 	"gogs.io/gogs/internal/sync"
 )
 
-var HookQueue = sync.NewUniqueQueue(conf.Webhook.QueueLength)
+var HookQueue = sync.NewUniqueQueue(1000)
 
 type HookContentType int
 
@@ -136,10 +136,10 @@ func (w *Webhook) AfterSet(colName string, _ xorm.Cell) {
 	}
 }
 
-func (w *Webhook) GetSlackHook() *SlackMeta {
+func (w *Webhook) SlackMeta() *SlackMeta {
 	s := &SlackMeta{}
 	if err := jsoniter.Unmarshal([]byte(w.Meta), s); err != nil {
-		log.Error("GetSlackHook [%d]: %v", w.ID, err)
+		log.Error("Failed to get Slack meta [webhook_id: %d]: %v", w.ID, err)
 	}
 	return s
 }
@@ -235,6 +235,25 @@ func CreateWebhook(w *Webhook) error {
 	return err
 }
 
+var _ errutil.NotFound = (*ErrWebhookNotExist)(nil)
+
+type ErrWebhookNotExist struct {
+	args map[string]interface{}
+}
+
+func IsErrWebhookNotExist(err error) bool {
+	_, ok := err.(ErrWebhookNotExist)
+	return ok
+}
+
+func (err ErrWebhookNotExist) Error() string {
+	return fmt.Sprintf("webhook does not exist: %v", err.args)
+}
+
+func (ErrWebhookNotExist) NotFound() bool {
+	return true
+}
+
 // getWebhook uses argument bean as query condition,
 // ID must be specified and do not assign unnecessary fields.
 func getWebhook(bean *Webhook) (*Webhook, error) {
@@ -242,7 +261,7 @@ func getWebhook(bean *Webhook) (*Webhook, error) {
 	if err != nil {
 		return nil, err
 	} else if !has {
-		return nil, errors.WebhookNotExist{bean.ID}
+		return nil, ErrWebhookNotExist{args: map[string]interface{}{"webhookID": bean.ID}}
 	}
 	return bean, nil
 }
@@ -437,10 +456,10 @@ type HookTask struct {
 
 func (t *HookTask) BeforeUpdate() {
 	if t.RequestInfo != nil {
-		t.RequestContent = t.MarshalJSON(t.RequestInfo)
+		t.RequestContent = t.ToJSON(t.RequestInfo)
 	}
 	if t.ResponseInfo != nil {
-		t.ResponseContent = t.MarshalJSON(t.ResponseInfo)
+		t.ResponseContent = t.ToJSON(t.ResponseInfo)
 	}
 }
 
@@ -472,7 +491,7 @@ func (t *HookTask) AfterSet(colName string, _ xorm.Cell) {
 	}
 }
 
-func (t *HookTask) MarshalJSON(v interface{}) string {
+func (t *HookTask) ToJSON(v interface{}) string {
 	p, err := jsoniter.Marshal(v)
 	if err != nil {
 		log.Error("Marshal [%d]: %v", t.ID, err)
@@ -499,6 +518,25 @@ func createHookTask(e Engine, t *HookTask) error {
 	return err
 }
 
+var _ errutil.NotFound = (*ErrHookTaskNotExist)(nil)
+
+type ErrHookTaskNotExist struct {
+	args map[string]interface{}
+}
+
+func IsHookTaskNotExist(err error) bool {
+	_, ok := err.(ErrHookTaskNotExist)
+	return ok
+}
+
+func (err ErrHookTaskNotExist) Error() string {
+	return fmt.Sprintf("hook task does not exist: %v", err.args)
+}
+
+func (ErrHookTaskNotExist) NotFound() bool {
+	return true
+}
+
 // GetHookTaskOfWebhookByUUID returns hook task of given webhook by UUID.
 func GetHookTaskOfWebhookByUUID(webhookID int64, uuid string) (*HookTask, error) {
 	hookTask := &HookTask{
@@ -509,7 +547,7 @@ func GetHookTaskOfWebhookByUUID(webhookID int64, uuid string) (*HookTask, error)
 	if err != nil {
 		return nil, err
 	} else if !has {
-		return nil, errors.HookTaskNotExist{webhookID, uuid}
+		return nil, ErrHookTaskNotExist{args: map[string]interface{}{"webhookID": webhookID, "uuid": uuid}}
 	}
 	return hookTask, nil
 }
@@ -563,7 +601,7 @@ func prepareHookTasks(e Engine, repo *Repository, event HookEventType, p api.Pay
 			}
 		}
 
-		// Use separate objects so modifcations won't be made on payload on non-Gogs type hooks.
+		// Use separate objects so modifications won't be made on payload on non-Gogs type hooks.
 		switch w.HookTaskType {
 		case SLACK:
 			payloader, err = GetSlackPayload(p, event, w.Meta)
@@ -591,7 +629,7 @@ func prepareHookTasks(e Engine, repo *Repository, event HookEventType, p api.Pay
 				log.Error("prepareWebhooks.JSONPayload: %v", err)
 			}
 			sig := hmac.New(sha256.New, []byte(w.Secret))
-			sig.Write(data)
+			_, _ = sig.Write(data)
 			signature = hex.EncodeToString(sig.Sum(nil))
 		}
 
@@ -731,7 +769,7 @@ func (t *HookTask) deliver() {
 // TODO: shoot more hooks at same time.
 func DeliverHooks() {
 	tasks := make([]*HookTask, 0, 10)
-	x.Where("is_delivered = ?", false).Iterate(new(HookTask),
+	_ = x.Where("is_delivered = ?", false).Iterate(new(HookTask),
 		func(idx int, bean interface{}) error {
 			t := bean.(*HookTask)
 			t.deliver()

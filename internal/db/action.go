@@ -11,7 +11,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/json-iterator/go"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/unknwon/com"
 	log "unknwon.dev/clog/v2"
 	"xorm.io/xorm"
@@ -20,7 +20,6 @@ import (
 	api "github.com/gogs/go-gogs-client"
 
 	"gogs.io/gogs/internal/conf"
-	"gogs.io/gogs/internal/db/errors"
 	"gogs.io/gogs/internal/lazyregexp"
 	"gogs.io/gogs/internal/tool"
 )
@@ -58,9 +57,9 @@ var (
 	IssueCloseKeywords  = []string{"close", "closes", "closed", "fix", "fixes", "fixed", "resolve", "resolves", "resolved"}
 	IssueReopenKeywords = []string{"reopen", "reopens", "reopened"}
 
-	IssueCloseKeywordsPat     = lazyregexp.New(assembleKeywordsPattern(IssueCloseKeywords))
-	IssueReopenKeywordsPat    = lazyregexp.New(assembleKeywordsPattern(IssueReopenKeywords))
-	IssueReferenceKeywordsPat = lazyregexp.New(`(?i)(?:)(^| )\S+`)
+	IssueCloseKeywordsPat  = lazyregexp.New(assembleKeywordsPattern(IssueCloseKeywords))
+	IssueReopenKeywordsPat = lazyregexp.New(assembleKeywordsPattern(IssueReopenKeywords))
+	issueReferencePattern  = lazyregexp.New(`(?i)(?:)(^| )\S*#\d+`)
 )
 
 func assembleKeywordsPattern(words []string) string {
@@ -189,7 +188,7 @@ func newRepoAction(e Engine, doer, owner *User, repo *Repository) (err error) {
 		RepoID:       repo.ID,
 		RepoUserName: repo.Owner.Name,
 		RepoName:     repo.Name,
-		IsPrivate:    repo.IsPrivate,
+		IsPrivate:    repo.IsPrivate || repo.IsUnlisted,
 	})
 }
 
@@ -206,7 +205,7 @@ func renameRepoAction(e Engine, actUser *User, oldRepoName string, repo *Reposit
 		RepoID:       repo.ID,
 		RepoUserName: repo.Owner.Name,
 		RepoName:     repo.Name,
-		IsPrivate:    repo.IsPrivate,
+		IsPrivate:    repo.IsPrivate || repo.IsUnlisted,
 		Content:      oldRepoName,
 	}); err != nil {
 		return fmt.Errorf("notify watchers: %v", err)
@@ -256,21 +255,21 @@ func (pc *PushCommits) ToApiPayloadCommits(repoPath, repoURL string) ([]*api.Pay
 		author, err := GetUserByEmail(commit.AuthorEmail)
 		if err == nil {
 			authorUsername = author.Name
-		} else if !errors.IsUserNotExist(err) {
-			return nil, fmt.Errorf("GetUserByEmail: %v", err)
+		} else if !IsErrUserNotExist(err) {
+			return nil, fmt.Errorf("get user by email: %v", err)
 		}
 
 		committerUsername := ""
 		committer, err := GetUserByEmail(commit.CommitterEmail)
 		if err == nil {
 			committerUsername = committer.Name
-		} else if !errors.IsUserNotExist(err) {
-			return nil, fmt.Errorf("GetUserByEmail: %v", err)
+		} else if !IsErrUserNotExist(err) {
+			return nil, fmt.Errorf("get user by email: %v", err)
 		}
 
-		fileStatus, err := git.GetCommitFileStatus(repoPath, commit.Sha1)
+		nameStatus, err := git.RepoShowNameStatus(repoPath, commit.Sha1)
 		if err != nil {
-			return nil, fmt.Errorf("FileStatus [commit_sha1: %s]: %v", commit.Sha1, err)
+			return nil, fmt.Errorf("show name status [commit_sha1: %s]: %v", commit.Sha1, err)
 		}
 
 		commits[i] = &api.PayloadCommit{
@@ -287,9 +286,9 @@ func (pc *PushCommits) ToApiPayloadCommits(repoPath, repoURL string) ([]*api.Pay
 				Email:    commit.CommitterEmail,
 				UserName: committerUsername,
 			},
-			Added:     fileStatus.Added,
-			Removed:   fileStatus.Removed,
-			Modified:  fileStatus.Modified,
+			Added:     nameStatus.Added,
+			Removed:   nameStatus.Removed,
+			Modified:  nameStatus.Modified,
 			Timestamp: commit.Timestamp,
 		}
 	}
@@ -298,21 +297,21 @@ func (pc *PushCommits) ToApiPayloadCommits(repoPath, repoURL string) ([]*api.Pay
 
 // AvatarLink tries to match user in database with e-mail
 // in order to show custom avatar, and falls back to general avatar link.
-func (push *PushCommits) AvatarLink(email string) string {
-	_, ok := push.avatars[email]
+func (pcs *PushCommits) AvatarLink(email string) string {
+	_, ok := pcs.avatars[email]
 	if !ok {
 		u, err := GetUserByEmail(email)
 		if err != nil {
-			push.avatars[email] = tool.AvatarLink(email)
-			if !errors.IsUserNotExist(err) {
-				log.Error("GetUserByEmail: %v", err)
+			pcs.avatars[email] = tool.AvatarLink(email)
+			if !IsErrUserNotExist(err) {
+				log.Error("get user by email: %v", err)
 			}
 		} else {
-			push.avatars[email] = u.RelAvatarLink()
+			pcs.avatars[email] = u.RelAvatarLink()
 		}
 	}
 
-	return push.avatars[email]
+	return pcs.avatars[email]
 }
 
 // UpdateIssuesCommit checks if issues are manipulated by commit message.
@@ -322,8 +321,8 @@ func UpdateIssuesCommit(doer *User, repo *Repository, commits []*PushCommit) err
 		c := commits[i]
 
 		refMarked := make(map[int64]bool)
-		for _, ref := range IssueReferenceKeywordsPat.FindAllString(c.Message, -1) {
-			ref = ref[strings.IndexByte(ref, byte(' '))+1:]
+		for _, ref := range issueReferencePattern.FindAllString(c.Message, -1) {
+			ref = strings.TrimSpace(ref)
 			ref = strings.TrimRightFunc(ref, issueIndexTrimRight)
 
 			if len(ref) == 0 {
@@ -341,7 +340,7 @@ func UpdateIssuesCommit(doer *User, repo *Repository, commits []*PushCommit) err
 
 			issue, err := GetIssueByRef(ref)
 			if err != nil {
-				if errors.IsIssueNotExist(err) {
+				if IsErrIssueNotExist(err) {
 					continue
 				}
 				return err
@@ -383,7 +382,7 @@ func UpdateIssuesCommit(doer *User, repo *Repository, commits []*PushCommit) err
 
 			issue, err := GetIssueByRef(ref)
 			if err != nil {
-				if errors.IsIssueNotExist(err) {
+				if IsErrIssueNotExist(err) {
 					continue
 				}
 				return err
@@ -423,7 +422,7 @@ func UpdateIssuesCommit(doer *User, repo *Repository, commits []*PushCommit) err
 
 			issue, err := GetIssueByRef(ref)
 			if err != nil {
-				if errors.IsIssueNotExist(err) {
+				if IsErrIssueNotExist(err) {
 					continue
 				}
 				return err
@@ -456,7 +455,7 @@ type CommitRepoActionOptions struct {
 	Commits     *PushCommits
 }
 
-// CommitRepoAction adds new commit actio to the repository, and prepare corresponding webhooks.
+// CommitRepoAction adds new commit action to the repository, and prepare corresponding webhooks.
 func CommitRepoAction(opts CommitRepoActionOptions) error {
 	pusher, err := GetUserByName(opts.PusherName)
 	if err != nil {
@@ -474,12 +473,12 @@ func CommitRepoAction(opts CommitRepoActionOptions) error {
 		return fmt.Errorf("UpdateRepository: %v", err)
 	}
 
-	isNewRef := opts.OldCommitID == git.EMPTY_SHA
-	isDelRef := opts.NewCommitID == git.EMPTY_SHA
+	isNewRef := opts.OldCommitID == git.EmptyID
+	isDelRef := opts.NewCommitID == git.EmptyID
 
 	opType := ACTION_COMMIT_REPO
 	// Check if it's tag push or branch.
-	if strings.HasPrefix(opts.RefFullName, git.TAG_PREFIX) {
+	if strings.HasPrefix(opts.RefFullName, git.RefsTags) {
 		opType = ACTION_PUSH_TAG
 	} else {
 		// if not the first commit, set the compare URL.
@@ -504,7 +503,7 @@ func CommitRepoAction(opts CommitRepoActionOptions) error {
 		return fmt.Errorf("Marshal: %v", err)
 	}
 
-	refName := git.RefEndName(opts.RefFullName)
+	refName := git.RefShortName(opts.RefFullName)
 	action := &Action{
 		ActUserID:    pusher.ID,
 		ActUserName:  pusher.Name,
@@ -513,7 +512,7 @@ func CommitRepoAction(opts CommitRepoActionOptions) error {
 		RepoUserName: repo.MustOwner().Name,
 		RepoName:     repo.Name,
 		RefName:      refName,
-		IsPrivate:    repo.IsPrivate,
+		IsPrivate:    repo.IsPrivate || repo.IsUnlisted,
 	}
 
 	apiRepo := repo.APIFormat(nil)
@@ -629,7 +628,7 @@ func transferRepoAction(e Engine, doer, oldOwner *User, repo *Repository) (err e
 		RepoID:       repo.ID,
 		RepoUserName: repo.Owner.Name,
 		RepoName:     repo.Name,
-		IsPrivate:    repo.IsPrivate,
+		IsPrivate:    repo.IsPrivate || repo.IsUnlisted,
 		Content:      path.Join(oldOwner.Name, repo.Name),
 	}); err != nil {
 		return fmt.Errorf("notifyWatchers: %v", err)
@@ -660,7 +659,7 @@ func mergePullRequestAction(e Engine, doer *User, repo *Repository, issue *Issue
 		RepoID:       repo.ID,
 		RepoUserName: repo.Owner.Name,
 		RepoName:     repo.Name,
-		IsPrivate:    repo.IsPrivate,
+		IsPrivate:    repo.IsPrivate || repo.IsUnlisted,
 	})
 }
 
@@ -679,7 +678,7 @@ func mirrorSyncAction(opType ActionType, repo *Repository, refName string, data 
 		RepoUserName: repo.MustOwner().Name,
 		RepoName:     repo.Name,
 		RefName:      refName,
-		IsPrivate:    repo.IsPrivate,
+		IsPrivate:    repo.IsPrivate || repo.IsUnlisted,
 	})
 }
 

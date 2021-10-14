@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,10 +23,8 @@ import (
 
 	"gogs.io/gogs/internal/conf"
 	"gogs.io/gogs/internal/db"
-	"gogs.io/gogs/internal/db/errors"
 	"gogs.io/gogs/internal/email"
 	"gogs.io/gogs/internal/httplib"
-	"gogs.io/gogs/internal/template"
 )
 
 var (
@@ -67,7 +66,7 @@ func runHookPreReceive(c *cli.Context) error {
 	if len(os.Getenv("SSH_ORIGINAL_COMMAND")) == 0 {
 		return nil
 	}
-	setup(c, "hooks/pre-receive.log", true)
+	setup(c, "pre-receive.log", true)
 
 	isWiki := strings.Contains(os.Getenv(db.ENV_REPO_CUSTOM_HOOKS_PATH), ".wiki.git/")
 
@@ -87,13 +86,13 @@ func runHookPreReceive(c *cli.Context) error {
 		}
 		oldCommitID := string(fields[0])
 		newCommitID := string(fields[1])
-		branchName := strings.TrimPrefix(string(fields[2]), git.BRANCH_PREFIX)
+		branchName := git.RefShortName(string(fields[2]))
 
 		// Branch protection
 		repoID := com.StrTo(os.Getenv(db.ENV_REPO_ID)).MustInt64()
 		protectBranch, err := db.GetProtectBranchOfRepoByName(repoID, branchName)
 		if err != nil {
-			if errors.IsErrBranchNotExist(err) {
+			if db.IsErrBranchNotExist(err) {
 				continue
 			}
 			fail("Internal error", "GetProtectBranchOfRepoByName [repo_id: %d, branch: %s]: %v", repoID, branchName, err)
@@ -121,7 +120,7 @@ func runHookPreReceive(c *cli.Context) error {
 		}
 
 		// check and deletion
-		if newCommitID == git.EMPTY_SHA {
+		if newCommitID == git.EmptyID {
 			fail(fmt.Sprintf("Branch '%s' is protected from deletion", branchName), "")
 		}
 
@@ -160,7 +159,7 @@ func runHookUpdate(c *cli.Context) error {
 	if len(os.Getenv("SSH_ORIGINAL_COMMAND")) == 0 {
 		return nil
 	}
-	setup(c, "hooks/update.log", false)
+	setup(c, "update.log", false)
 
 	args := c.Args()
 	if len(args) != 3 {
@@ -194,7 +193,7 @@ func runHookPostReceive(c *cli.Context) error {
 	if len(os.Getenv("SSH_ORIGINAL_COMMAND")) == 0 {
 		return nil
 	}
-	setup(c, "hooks/post-receive.log", true)
+	setup(c, "post-receive.log", true)
 
 	// Post-receive hook does more than just gather Git information,
 	// so we need to setup additional services for email notifications.
@@ -221,7 +220,7 @@ func runHookPostReceive(c *cli.Context) error {
 		options := db.PushUpdateOptions{
 			OldCommitID:  string(fields[0]),
 			NewCommitID:  string(fields[1]),
-			RefFullName:  string(fields[2]),
+			FullRefspec:  string(fields[2]),
 			PusherID:     com.StrTo(os.Getenv(db.ENV_AUTH_USER_ID)).MustInt64(),
 			PusherName:   os.Getenv(db.ENV_AUTH_USER_NAME),
 			RepoUserName: os.Getenv(db.ENV_REPO_OWNER_NAME),
@@ -232,19 +231,21 @@ func runHookPostReceive(c *cli.Context) error {
 		}
 
 		// Ask for running deliver hook and test pull request tasks
-		reqURL := conf.Server.LocalRootURL + options.RepoUserName + "/" + options.RepoName + "/tasks/trigger?branch=" +
-			template.EscapePound(strings.TrimPrefix(options.RefFullName, git.BRANCH_PREFIX)) +
-			"&secret=" + os.Getenv(db.ENV_REPO_OWNER_SALT_MD5) +
-			"&pusher=" + os.Getenv(db.ENV_AUTH_USER_ID)
+		q := make(url.Values)
+		q.Add("branch", git.RefShortName(options.FullRefspec))
+		q.Add("secret", os.Getenv(db.ENV_REPO_OWNER_SALT_MD5))
+		q.Add("pusher", os.Getenv(db.ENV_AUTH_USER_ID))
+		reqURL := fmt.Sprintf("%s%s/%s/tasks/trigger?%s", conf.Server.LocalRootURL, options.RepoUserName, options.RepoName, q.Encode())
 		log.Trace("Trigger task: %s", reqURL)
 
-		resp, err := httplib.Head(reqURL).SetTLSClientConfig(&tls.Config{
-			InsecureSkipVerify: true,
-		}).Response()
+		resp, err := httplib.Get(reqURL).
+			SetTLSClientConfig(&tls.Config{
+				InsecureSkipVerify: true,
+			}).Response()
 		if err == nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			if resp.StatusCode/100 != 2 {
-				log.Error("Failed to trigger task: not 2xx response code")
+				log.Error("Failed to trigger task: unsuccessful response code %d", resp.StatusCode)
 			}
 		} else {
 			log.Error("Failed to trigger task: %v", err)

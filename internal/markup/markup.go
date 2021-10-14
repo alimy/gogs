@@ -145,7 +145,8 @@ func RenderSha1CurrentPattern(rawBytes []byte, urlPrefix string) []byte {
 		if com.StrTo(m).MustInt() > 0 {
 			return m
 		}
-		return fmt.Sprintf(`<a href="%s/commit/%s"><code>%s</code></a>`, urlPrefix, m, tool.ShortSHA1(string(m)))
+
+		return fmt.Sprintf(`<a href="%s/commit/%s"><code>%s</code></a>`, urlPrefix, m, tool.ShortSHA1(m))
 	}))
 }
 
@@ -160,7 +161,7 @@ func RenderSpecialLink(rawBytes []byte, urlPrefix string, metas map[string]strin
 
 	rawBytes = RenderIssueIndexPattern(rawBytes, urlPrefix, metas)
 	rawBytes = RenderCrossReferenceIssueIndexPattern(rawBytes, urlPrefix, metas)
-	rawBytes = RenderSha1CurrentPattern(rawBytes, urlPrefix)
+	rawBytes = RenderSha1CurrentPattern(rawBytes, metas["repoLink"])
 	return rawBytes
 }
 
@@ -215,7 +216,7 @@ func wrapImgWithLink(urlPrefix string, buf *bytes.Buffer, token html.Token) {
 	buf.WriteString(`">`)
 
 	if needPrepend {
-		src = strings.Replace(urlPrefix+string(src), " ", "%20", -1)
+		src = strings.Replace(urlPrefix+src, " ", "%20", -1)
 		buf.WriteString(`<img src="`)
 		buf.WriteString(src)
 		buf.WriteString(`"`)

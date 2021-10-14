@@ -5,10 +5,6 @@ CONF_FILES := $(shell find conf | sed 's/ /\\ /g')
 TEMPLATES_FILES := $(shell find templates | sed 's/ /\\ /g')
 PUBLIC_FILES := $(shell find public | sed 's/ /\\ /g')
 LESS_FILES := $(wildcard public/less/*.less)
-ASSETS_GENERATED := internal/assets/conf/conf_gen.go internal/assets/templates/templates_gen.go internal/assets/public/public_gen.go
-GENERATED := $(ASSETS_GENERATED) public/css/gogs.css
-
-OS := $(shell uname)
 
 TAGS = ""
 BUILD_FLAGS = "-v"
@@ -16,9 +12,8 @@ BUILD_FLAGS = "-v"
 RELEASE_ROOT = "release"
 RELEASE_GOGS = "release/gogs"
 NOW = $(shell date -u '+%Y%m%d%I%M%S')
-GOVET = go tool vet -composites=false -methods=false -structtags=false
 
-.PHONY: build pack release generate clean
+.PHONY: check dist build build-no-gen pack release generate less clean test fixme todo legacy
 
 .IGNORE: public/css/gogs.css
 
@@ -31,14 +26,7 @@ dist: release
 web: build
 	./gogs web
 
-govet:
-	$(GOVET) gogs.go
-	$(GOVET) models pkg routes
-
-build: $(GENERATED)
-	go build $(BUILD_FLAGS) -ldflags '$(LDFLAGS)' -tags '$(TAGS)' -trimpath -o gogs
-
-build-no-gen:
+build:
 	go build $(BUILD_FLAGS) -ldflags '$(LDFLAGS)' -tags '$(TAGS)' -trimpath -o gogs
 
 pack:
@@ -49,29 +37,17 @@ pack:
 
 release: build pack
 
-generate: $(ASSETS_GENERATED)
-
-internal/assets/conf/conf_gen.go: $(CONF_FILES)
-	-rm -f $@
+generate: clean
 	go generate internal/assets/conf/conf.go
-	gofmt -s -w $@
-
-internal/assets/templates/templates_gen.go: $(TEMPLATES_FILES)
-	-rm -f $@
 	go generate internal/assets/templates/templates.go
-	gofmt -s -w $@
-
-internal/assets/public/public_gen.go: $(PUBLIC_FILES)
-	-rm -f $@
 	go generate internal/assets/public/public.go
-	gofmt -s -w $@
 
-less: public/css/gogs.css
+less: clean public/css/gogs.min.css
 
-public/css/gogs.css: $(LESS_FILES)
-	@type lessc >/dev/null 2>&1 && lessc --source-map "public/less/gogs.less" $@ || echo "lessc command not found or failed"
+public/css/gogs.min.css: $(LESS_FILES)
+	@type lessc >/dev/null 2>&1 && lessc --clean-css --source-map "public/less/gogs.less" $@ || echo "lessc command not found or failed"
 
-clean-mac:
+clean:
 	find . -name "*.DS_Store" -type f -delete
 
 test:
@@ -83,6 +59,6 @@ fixme:
 todo:
 	grep -rnw "TODO" internal
 
-# Legacy code should be remove by the time of release
+# Legacy code should be removed by the time of release
 legacy:
-	grep -rnw "\(LEGACY\|DEPRECATED\)" internal
+	grep -rnw "\(LEGACY\|Deprecated\)" internal

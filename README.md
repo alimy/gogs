@@ -1,6 +1,6 @@
-# <img src="https://github.com/gogs/gogs/raw/master/public/img/favicon.png" width="45" align="left">Gogs - A painless self-hosted Git service
+# <img src="https://github.com/gogs/gogs/raw/main/public/img/favicon.png" width="45" align="left">Gogs - A painless self-hosted Git service
 
-[![Build status](https://img.shields.io/travis/gogs/gogs/master.svg?style=for-the-badge&logo=travis)](https://travis-ci.org/gogs/gogs) [![Build status](https://img.shields.io/appveyor/ci/Unknwon/gogs?logo=appveyor&style=for-the-badge)](https://ci.appveyor.com/project/Unknwon/gogs/branch/master) [![Discord](https://img.shields.io/discord/382595433060499458.svg?style=for-the-badge&logo=discord)](https://discord.gg/9aqdHU7) [![Sourcegraph](https://img.shields.io/badge/view%20on-Sourcegraph-brightgreen.svg?style=for-the-badge&logo=sourcegraph)](https://sourcegraph.com/github.com/gogs/gogs)
+[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/gogs/gogs/Go?logo=github&style=for-the-badge)](https://github.com/gogs/gogs/actions?query=workflow%3AGo) [![Discord](https://img.shields.io/discord/382595433060499458.svg?style=for-the-badge&logo=discord)](https://discord.gg/9aqdHU7) [![Sourcegraph](https://img.shields.io/badge/view%20on-Sourcegraph-brightgreen.svg?style=for-the-badge&logo=sourcegraph)](https://sourcegraph.com/github.com/gogs/gogs)
 
 ![Repository](https://gogs.io/img/screenshots/2.png)
 
@@ -17,7 +17,7 @@ The Gogs (`/gɑgz/`) project aims to build a simple, stable and extensible self-
 - Want to try it before doing anything else? Do it [online](https://try.gogs.io/gogs/gogs)!
 - Having trouble? Help yourself with [troubleshooting](https://gogs.io/docs/intro/troubleshooting.html) or ask questions on [user forum](https://discuss.gogs.io/).
 - Want to help with localization? Check out the [localization documentation](https://gogs.io/docs/features/i18n.html).
-- Ready to get hands dirty? Read [our guide](docs/local_development.md) to set up your development environment.
+- Ready to get hands dirty? Read our guide to [set up your development environment](docs/dev/local_development.md).
 - Hmm... What about APIs? We have experimental support with [documentation](https://github.com/gogs/docs-api).
 
 ## 💌 Features
@@ -26,14 +26,14 @@ The Gogs (`/gɑgz/`) project aims to build a simple, stable and extensible self-
 - Access repositories via SSH, HTTP and HTTPS protocols.
 - User, organization and repository management.
 - Repository and organization webhooks, including Slack, Discord and Dingtalk.
-- Repository Git hooks and deploy keys.
+- Repository Git hooks, deploy keys and Git LFS.
 - Repository issues, pull requests, wiki, protected branches and collaboration.
 - Migrate and mirror repositories with wiki from other code hosts.
 - Web editor for quick editing repository files and wiki.
 - Jupyter Notebook and PDF rendering.
 - Authentication via SMTP, LDAP, reverse proxy, GitHub.com and GitHub Enterprise with 2FA.
 - Customize HTML templates, static files and many others.
-- Rich database backend, including PostgreSQL, MySQL, SQLite3, MSSQL and [TiDB](https://github.com/pingcap/tidb).
+- Rich database backend, including PostgreSQL, MySQL, SQLite3 and [TiDB](https://github.com/pingcap/tidb).
 - Have localization over [30 languages](https://crowdin.com/project/gogs).
 
 ## 💾 Hardware requirements
@@ -56,13 +56,12 @@ There are 6 ways to install Gogs:
 - [Install from binary](https://gogs.io/docs/installation/install_from_binary.html)
 - [Install from source](https://gogs.io/docs/installation/install_from_source.html)
 - [Install from packages](https://gogs.io/docs/installation/install_from_packages.html)
-- [Ship with Docker](https://github.com/gogs/gogs/tree/master/docker)
+- [Ship with Docker](https://github.com/gogs/gogs/tree/main/docker)
 - [Install with Vagrant](https://github.com/geerlingguy/ansible-vagrant-examples/tree/master/gogs)
 - [Install with Kubernetes Using Helm Charts](https://github.com/helm/charts/tree/master/incubator/gogs)
 
 ### Deploy to cloud
 
-- [OpenShift](https://github.com/tkisme/gogs-openshift)
 - [Cloudron](https://cloudron.io/appstore.html#io.gogs.cloudronapp)
 - [Scaleway](https://www.scaleway.com/imagehub/gogs/)
 - [Sandstorm](https://github.com/cem/gogs-sandstorm)
@@ -73,6 +72,7 @@ There are 6 ways to install Gogs:
 
 ### Tutorials
 
+- [Private Git Web Portal in Raspberry PI With Gogs](https://peppe8o.com/private-git-web-portal-in-raspberry-pi-with-gogs/)
 - [How To Set Up Gogs on Ubuntu 14.04](https://www.digitalocean.com/community/tutorials/how-to-set-up-gogs-on-ubuntu-14-04)
 - [Run your own GitHub-like service with the help of Docker](http://blog.hypriot.com/post/run-your-own-github-like-service-with-docker/)
 - [Dockerized Gogs git server and alpine postgres in 20 minutes or less](http://garthwaite.org/docker-gogs.html)
@@ -89,8 +89,6 @@ There are 6 ways to install Gogs:
 - [Jenkins](https://plugins.jenkins.io/gogs-webhook/) (CI)
 - [Taiga](https://taiga.io/) (Project Management)
 - [Puppet](https://forge.puppet.com/Siteminds/gogs) (IT)
-- [Kanboard](https://github.com/kanboard/plugin-gogs-webhook) (Project Management)
-- [BearyChat](https://bearychat.com/) (Team Communication)
 - [GitPitch](https://gitpitch.com/) (Markdown Presentations)
 - [Synology](https://www.synology.com) (Docker)
 - [Syncloud](https://syncloud.org/) (App Store)
@@ -99,7 +97,7 @@ There are 6 ways to install Gogs:
 
 - Thanks [Egon Elbre](https://twitter.com/egonelbre) for designing the original version of the logo.
 - Thanks [Crowdin](https://crowdin.com/project/gogs) for sponsoring open source translation plan.
-- Thanks [DigitalOcean](https://www.digitalocean.com), [VPSServer](https://www.vpsserver.com/), [Hosted.nl](https://www.hosted.nl/), [MonoVM](https://monovm.com) and [BitLaunch](https://bitlaunch.io) for sponsoring VPS services.
+- Thanks [DigitalOcean](https://www.digitalocean.com), [VPSServer](https://www.vpsserver.com/), [Hosted.nl](https://www.hosted.nl/) and [BitLaunch](https://bitlaunch.io) for sponsoring VPS services.
 - Thanks [KeyCDN](https://www.keycdn.com/) for sponsoring CDN service.
 - Thanks [Buildkite](https://buildkite.com) for sponsoring open source CI/CD plan.
 
@@ -108,6 +106,6 @@ There are 6 ways to install Gogs:
 - See [contributors page](https://github.com/gogs/gogs/graphs/contributors) for top 100 contributors.
 - See [TRANSLATORS](conf/locale/TRANSLATORS) for public list of translators.
 
-## License
+## ⚖️ License
 
-This project is under the MIT License. See the [LICENSE](https://github.com/gogs/gogs/blob/master/LICENSE) file for the full license text.
+This project is under the MIT License. See the [LICENSE](https://github.com/gogs/gogs/blob/main/LICENSE) file for the full license text.

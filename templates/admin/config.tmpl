@@ -62,11 +62,6 @@
 
 						<dt>{{.i18n.Tr "admin.config.server.landing_url"}}</dt>
 						<dd><code>{{.Server.LandingURL}}</code></dd>
-
-						<div class="ui divider"></div>
-
-						<dt>{{.i18n.Tr "admin.config.log_file_root_path"}}</dt>
-						<dd><code>{{.LogRootPath}}</code></dd>
 					</dl>
 				</div>
 
@@ -106,6 +101,8 @@
 							<dd>{{.SSH.ListenPort}}</dd>
 							<dt>{{.i18n.Tr "admin.config.ssh.server_ciphers"}}</dt>
 							<dd><code>{{.SSH.ServerCiphers}}</code></dd>
+							<dt>{{.i18n.Tr "admin.config.ssh.server_macs"}}</dt>
+							<dd><code>{{.SSH.ServerMACs}}</code></dd>
 						{{end}}
 					</dl>
 				</div>
@@ -121,7 +118,13 @@
 						<dt>{{.i18n.Tr "admin.config.repo.script_type"}}</dt>
 						<dd><code>{{.Repository.ScriptType}}</code></dd>
 						<dt>{{.i18n.Tr "admin.config.repo.ansi_chatset"}}</dt>
-						<dd>{{if .Repository.ANSICharset}}{{.Repository.AnsiCharset}}{{else}}{{.i18n.Tr "admin.config.not_set"}}{{end}}</dd>
+						<dd>
+							{{if .Repository.ANSICharset}}
+								{{.Repository.AnsiCharset}}
+							{{else}}
+								<i>{{.i18n.Tr "admin.config.not_set"}}</i>
+							{{end}}
+						</dd>
 						<dt>{{.i18n.Tr "admin.config.repo.force_private"}}</dt>
 						<dd><i class="fa fa{{if .Repository.ForcePrivate}}-check{{end}}-square-o"></i></dd>
 						<dt>{{.i18n.Tr "admin.config.repo.max_creation_limit"}}</dt>
@@ -177,6 +180,13 @@
 						<dd>{{.Database.SSLMode}} {{.i18n.Tr "admin.config.db.ssl_mode_helper"}}</dd>
 						<dt>{{.i18n.Tr "admin.config.db.path"}}</dt>
 						<dd><code>{{.Database.Path}}</code> {{.i18n.Tr "admin.config.db.path_helper"}}</dd>
+
+						<div class="ui divider"></div>
+
+						<dt>{{.i18n.Tr "admin.config.db.max_open_conns"}}</dt>
+						<dd>{{.Database.MaxOpenConns}}</dd>
+						<dt>{{.i18n.Tr "admin.config.db.max_idle_conns"}}</dt>
+						<dd>{{.Database.MaxIdleConns}}</dd>
 					</dl>
 				</div>
 
@@ -224,7 +234,13 @@
 							<dt>{{.i18n.Tr "admin.config.email.disable_helo"}}</dt>
 							<dd><i class="fa fa{{if .Email.DisableHELO}}-check{{end}}-square-o"></i></dd>
 							<dt>{{.i18n.Tr "admin.config.email.helo_hostname"}}</dt>
-							<dd>{{if .Email.HELOHostname}}{{.Email.HELOHostname}}{{else}}{{.i18n.Tr "admin.config.not_set"}}{{end}}</dd>
+							<dd>
+								{{if .Email.HELOHostname}}
+									{{.Email.HELOHostname}}
+								{{else}}
+									<i>{{.i18n.Tr "admin.config.not_set"}}</i>
+								{{end}}
+							</dd>
 
 							<div class="ui divider"></div>
 
@@ -289,7 +305,6 @@
 					</dl>
 				</div>
 
-
 				{{/* User settings */}}
 				<h4 class="ui top attached header">
 					{{.i18n.Tr "admin.config.user_config"}}
@@ -301,13 +316,112 @@
 					</dl>
 				</div>
 
-				<!-- HTTP Configuration -->
+				{{/* Session settings */}}
+				<h4 class="ui top attached header">
+					{{.i18n.Tr "admin.config.session_config"}}
+				</h4>
+				<div class="ui attached table segment">
+					<dl class="dl-horizontal admin-dl-horizontal">
+						<dt>{{.i18n.Tr "admin.config.session_provider"}}</dt>
+						<dd>{{.Session.Provider}}</dd>
+						<dt>{{.i18n.Tr "admin.config.session.provider_config"}}</dt>
+						<dd><code>{{.Session.ProviderConfig}}</code></dd>
+						<dt>{{.i18n.Tr "admin.config.session.cookie_name"}}</dt>
+						<dd>{{.Session.CookieName}}</dd>
+						<dt>{{.i18n.Tr "admin.config.session.https_only"}}</dt>
+						<dd><i class="fa fa{{if .Session.CookieSecure}}-check{{end}}-square-o"></i></dd>
+						<dt>{{.i18n.Tr "admin.config.session.gc_interval"}}</dt>
+						<dd>{{.Session.GCInterval}} {{.i18n.Tr "tool.raw_seconds"}}</dd>
+						<dt>{{.i18n.Tr "admin.config.session.max_life_time"}}</dt>
+						<dd>{{.Session.MaxLifeTime}} {{.i18n.Tr "tool.raw_seconds"}}</dd>
+						<dt>{{.i18n.Tr "admin.config.session.csrf_cookie_name"}}</dt>
+						<dd>{{.Session.CSRFCookieName}}</dd>
+					</dl>
+				</div>
+
+				{{/* Cache settings */}}
+				<h4 class="ui top attached header">
+					{{.i18n.Tr "admin.config.cache_config"}}
+				</h4>
+				<div class="ui attached table segment">
+					<dl class="dl-horizontal admin-dl-horizontal">
+						<dt>{{.i18n.Tr "admin.config.cache.adapter"}}</dt>
+						<dd>{{.Cache.Adapter}}</dd>
+						<dt>{{.i18n.Tr "admin.config.cache.interval"}}</dt>
+						<dd>{{.Cache.Interval}} {{.i18n.Tr "tool.raw_seconds"}}</dd>
+						<dt>{{.i18n.Tr "admin.config.cache.host"}}</dt>
+						<dd>
+							{{if .CacheConn}}
+								<code>{{.CacheConn}}</code>
+							{{else}}
+								<i>{{.i18n.Tr "admin.config.not_set"}}</i>
+							{{end}}
+						</dd>
+					</dl>
+				</div>
+
+				{{/* Attachment settings */}}
+				<h4 class="ui top attached header">
+					{{.i18n.Tr "admin.config.attachment_config"}}
+				</h4>
+				<div class="ui attached table segment">
+					<dl class="dl-horizontal admin-dl-horizontal">
+						<dt>{{.i18n.Tr "admin.config.attachment.enabled"}}</dt>
+						<dd><i class="fa fa{{if .Attachment.Enabled}}-check{{end}}-square-o"></i></dd>
+						<dt>{{.i18n.Tr "admin.config.attachment.path"}}</dt>
+						<dd><code>{{.Attachment.Path}}</code></dd>
+						<dt>{{.i18n.Tr "admin.config.attachment.allowed_types"}}</dt>
+						<dd><code>{{.Attachment.AllowedTypes}}</code></dd>
+						<dt>{{.i18n.Tr "admin.config.attachment.max_size"}}</dt>
+						<dd>{{.Attachment.MaxSize}} MB</dd>
+						<dt>{{.i18n.Tr "admin.config.attachment.max_files"}}</dt>
+						<dd>{{.Attachment.MaxFiles}}</dd>
+					</dl>
+				</div>
+
+				{{/* Release settings */}}
+				<h4 class="ui top attached header">
+					{{.i18n.Tr "admin.config.release_config"}}
+				</h4>
+				<div class="ui attached table segment">
+					<dl class="dl-horizontal admin-dl-horizontal">
+						<dt>{{.i18n.Tr "admin.config.release.attachment.enabled"}}</dt>
+						<dd><i class="fa fa{{if .Release.Attachment.Enabled}}-check{{end}}-square-o"></i></dd>
+						<dt>{{.i18n.Tr "admin.config.release.attachment.allowed_types"}}</dt>
+						<dd><code>{{.Release.Attachment.AllowedTypes}}</code></dd>
+						<dt>{{.i18n.Tr "admin.config.release.attachment.max_size"}}</dt>
+						<dd>{{.Release.Attachment.MaxSize}} MB</dd>
+						<dt>{{.i18n.Tr "admin.config.release.attachment.max_files"}}</dt>
+						<dd>{{.Release.Attachment.MaxFiles}}</dd>
+					</dl>
+				</div>
+
+				{{/* Picture settings */}}
+				<h4 class="ui top attached header">
+					{{.i18n.Tr "admin.config.picture_config"}}
+				</h4>
+				<div class="ui attached table segment">
+					<dl class="dl-horizontal admin-dl-horizontal">
+						<dt>{{.i18n.Tr "admin.config.picture.avatar_upload_path"}}</dt>
+						<dd><code>{{.Picture.AvatarUploadPath}}</code></dd>
+						<dt>{{.i18n.Tr "admin.config.picture.repo_avatar_upload_path"}}</dt>
+						<dd><code>{{.Picture.RepositoryAvatarUploadPath}}</code></dd>
+						<dt>{{.i18n.Tr "admin.config.picture.gravatar_source"}}</dt>
+						<dd><code>{{.Picture.GravatarSource}}</code></dd>
+						<dt>{{.i18n.Tr "admin.config.picture.disable_gravatar"}}</dt>
+						<dd><i class="fa fa{{if .Picture.DisableGravatar}}-check{{end}}-square-o"></i></dd>
+						<dt>{{.i18n.Tr "admin.config.picture.enable_federated_avatar"}}</dt>
+						<dd><i class="fa fa{{if .Picture.EnableFederatedAvatar}}-check{{end}}-square-o"></i></dd>
+					</dl>
+				</div>
+
+				{{/* HTTP settings */}}
 				<h4 class="ui top attached header">
 					{{.i18n.Tr "admin.config.http_config"}}
 				</h4>
 				<div class="ui attached table segment">
 					<dl class="dl-horizontal admin-dl-horizontal">
-						<dt>{{.i18n.Tr "admin.config.http_access_control_allow_origin"}}</dt>
+						<dt>{{.i18n.Tr "admin.config.http.access_control_allow_origin"}}</dt>
 						<dd>
 							{{if .HTTP.AccessControlAllowOrigin}}
 								<code>{{.HTTP.AccessControlAllowOrigin}}</code>
@@ -318,104 +432,89 @@
 					</dl>
 				</div>
 
+				{{/* Mirror settings */}}
+				<h4 class="ui top attached header">
+					{{.i18n.Tr "admin.config.mirror_config"}}
+				</h4>
+				<div class="ui attached table segment">
+					<dl class="dl-horizontal admin-dl-horizontal">
+						<dt>{{.i18n.Tr "admin.config.mirror.default_interval"}}</dt>
+						<dd>{{.Mirror.DefaultInterval}} {{.i18n.Tr "tool.raw_hours"}}</dd>
+					</dl>
+				</div>
+
+				{{/* Webhook settings */}}
 				<h4 class="ui top attached header">
 					{{.i18n.Tr "admin.config.webhook_config"}}
 				</h4>
 				<div class="ui attached table segment">
 					<dl class="dl-horizontal admin-dl-horizontal">
-						<dt>{{.i18n.Tr "admin.config.queue_length"}}</dt>
-						<dd>{{.Webhook.QueueLength}}</dd>
-						<dt>{{.i18n.Tr "admin.config.deliver_timeout"}}</dt>
+						<dt>{{.i18n.Tr "admin.config.webhook.types"}}</dt>
+						<dd><code>{{.Webhook.Types}}</code></dd>
+						<dt>{{.i18n.Tr "admin.config.webhook.deliver_timeout"}}</dt>
 						<dd>{{.Webhook.DeliverTimeout}} {{.i18n.Tr "tool.raw_seconds"}}</dd>
-						<dt>{{.i18n.Tr "admin.config.skip_tls_verify"}}</dt>
+						<dt>{{.i18n.Tr "admin.config.webhook.skip_tls_verify"}}</dt>
 						<dd><i class="fa fa{{if .Webhook.SkipTLSVerify}}-check{{end}}-square-o"></i></dd>
 					</dl>
 				</div>
 
-				<h4 class="ui top attached header">
-					{{.i18n.Tr "admin.config.cache_config"}}
-				</h4>
-				<div class="ui attached table segment">
-					<dl class="dl-horizontal admin-dl-horizontal">
-						<dt>{{.i18n.Tr "admin.config.cache_adapter"}}</dt>
-						<dd>{{.CacheAdapter}}</dd>
-						<dt>{{.i18n.Tr "admin.config.cache_interval"}}</dt>
-						<dd>{{.CacheInterval}} {{.i18n.Tr "tool.raw_seconds"}}</dd>
-						{{if .CacheConn}}
-						<dt>{{.i18n.Tr "admin.config.cache_conn"}}</dt>
-						<dd><code>{{.CacheConn}}</code></dd>
-						{{end}}
-					</dl>
-				</div>
-
-				<h4 class="ui top attached header">
-					{{.i18n.Tr "admin.config.session_config"}}
-				</h4>
-				<div class="ui attached table segment">
-					<dl class="dl-horizontal admin-dl-horizontal">
-						<dt>{{.i18n.Tr "admin.config.session_provider"}}</dt>
-						<dd>{{.SessionConfig.Provider}}</dd>
-						<dt>{{.i18n.Tr "admin.config.provider_config"}}</dt>
-						<dd><code>{{.SessionConfig.ProviderConfig}}</code></dd>
-						<dt>{{.i18n.Tr "admin.config.cookie_name"}}</dt>
-						<dd>{{.SessionConfig.CookieName}}</dd>
-						<dt>{{.i18n.Tr "admin.config.gc_interval_time"}}</dt>
-						<dd>{{.SessionConfig.Gclifetime}} {{.i18n.Tr "tool.raw_seconds"}}</dd>
-						<dt>{{.i18n.Tr "admin.config.session_life_time"}}</dt>
-						<dd>{{.SessionConfig.Maxlifetime}} {{.i18n.Tr "tool.raw_seconds"}}</dd>
-						<dt>{{.i18n.Tr "admin.config.https_only"}}</dt>
-						<dd><i class="fa fa{{if .SessionConfig.Secure}}-check{{end}}-square-o"></i></dd>
-						<dt>{{.i18n.Tr "admin.config.cookie_life_time"}}</dt>
-						<dd>{{.SessionConfig.CookieLifeTime}} {{.i18n.Tr "tool.raw_seconds"}}</dd>
-					</dl>
-				</div>
-
-				<h4 class="ui top attached header">
-					{{.i18n.Tr "admin.config.picture_config"}}
-				</h4>
-				<div class="ui attached table segment">
-					<dl class="dl-horizontal admin-dl-horizontal">
-						<dt>{{.i18n.Tr "admin.config.disable_gravatar"}}</dt>
-						<dd><i class="fa fa{{if .DisableGravatar}}-check{{end}}-square-o"></i></dd>
-						<div class="ui divider"></div>
-						<dt>{{.i18n.Tr "admin.config.enable_federated_avatar"}}</dt>
-						<dd><i class="fa fa{{if .EnableFederatedAvatar}}-check{{end}}-square-o"></i></dd>
-					</dl>
-				</div>
-
+				{{/* Git settings */}}
 				<h4 class="ui top attached header">
 					{{.i18n.Tr "admin.config.git_config"}}
 				</h4>
 				<div class="ui attached table segment">
 					<dl class="dl-horizontal admin-dl-horizontal">
-						<dt>{{.i18n.Tr "admin.config.git_disable_diff_highlight"}}</dt>
+						<dt>{{.i18n.Tr "admin.config.git.disable_diff_highlight"}}</dt>
 						<dd><i class="fa fa{{if .Git.DisableDiffHighlight}}-check{{end}}-square-o"></i></dd>
-						<dt>{{.i18n.Tr "admin.config.git_max_diff_lines"}}</dt>
-						<dd>{{.Git.MaxGitDiffLines}}</dd>
-						<dt>{{.i18n.Tr "admin.config.git_max_diff_line_characters"}}</dt>
-						<dd>{{.Git.MaxGitDiffLineCharacters}}</dd>
-						<dt>{{.i18n.Tr "admin.config.git_max_diff_files"}}</dt>
-						<dd>{{.Git.MaxGitDiffFiles}}</dd>
-						<dt>{{.i18n.Tr "admin.config.git_gc_args"}}</dt>
+						<dt>{{.i18n.Tr "admin.config.git.max_diff_lines"}}</dt>
+						<dd>{{.Git.MaxDiffLines}}</dd>
+						<dt>{{.i18n.Tr "admin.config.git.max_diff_line_characters"}}</dt>
+						<dd>{{.Git.MaxDiffLineChars}}</dd>
+						<dt>{{.i18n.Tr "admin.config.git.max_diff_files"}}</dt>
+						<dd>{{.Git.MaxDiffFiles}}</dd>
+						<dt>{{.i18n.Tr "admin.config.git.gc_args"}}</dt>
 						<dd><code>{{.Git.GCArgs}}</code></dd>
+
 						<div class="ui divider"></div>
-						<dt>{{.i18n.Tr "admin.config.git_migrate_timeout"}}</dt>
+
+						<dt>{{.i18n.Tr "admin.config.git.migrate_timeout"}}</dt>
 						<dd>{{.Git.Timeout.Migrate}} {{.i18n.Tr "tool.raw_seconds"}}</dd>
-						<dt>{{.i18n.Tr "admin.config.git_mirror_timeout"}}</dt>
+						<dt>{{.i18n.Tr "admin.config.git.mirror_timeout"}}</dt>
 						<dd>{{.Git.Timeout.Mirror}} {{.i18n.Tr "tool.raw_seconds"}}</dd>
-						<dt>{{.i18n.Tr "admin.config.git_clone_timeout"}}</dt>
+						<dt>{{.i18n.Tr "admin.config.git.clone_timeout"}}</dt>
 						<dd>{{.Git.Timeout.Clone}} {{.i18n.Tr "tool.raw_seconds"}}</dd>
-						<dt>{{.i18n.Tr "admin.config.git_pull_timeout"}}</dt>
+						<dt>{{.i18n.Tr "admin.config.git.pull_timeout"}}</dt>
 						<dd>{{.Git.Timeout.Pull}} {{.i18n.Tr "tool.raw_seconds"}}</dd>
-						<dt>{{.i18n.Tr "admin.config.git_gc_timeout"}}</dt>
+						<dt>{{.i18n.Tr "admin.config.git.gc_timeout"}}</dt>
 						<dd>{{.Git.Timeout.GC}} {{.i18n.Tr "tool.raw_seconds"}}</dd>
 					</dl>
 				</div>
 
+				{{/* LFS settings */}}
+				<h4 class="ui top attached header">
+					{{.i18n.Tr "admin.config.lfs_config"}}
+				</h4>
+				<div class="ui attached table segment">
+					<dl class="dl-horizontal admin-dl-horizontal">
+						<dt>{{.i18n.Tr "admin.config.lfs.storage"}}</dt>
+						<dd>{{.LFS.Storage}}</dd>
+						<dt>{{.i18n.Tr "admin.config.lfs.objects_path"}}</dt>
+						<dd><code>{{.LFS.ObjectsPath}}</code></dd>
+					</dl>
+				</div>
+
+				{{/* Log settings */}}
 				<h4 class="ui top attached header">
 					{{.i18n.Tr "admin.config.log_config"}}
 				</h4>
-				<div class="ui attached log-config segment">
+				<div class="ui attached log-config table segment">
+					<dl class="dl-horizontal admin-dl-horizontal">
+						<dt>{{.i18n.Tr "admin.config.log_file_root_path"}}</dt>
+						<dd><code>{{.LogRootPath}}</code></dd>
+					</dl>
+
+					<div class="ui divider"></div>
+
 					<table class="ui very basic table">
 						{{range .Loggers}}
 							<tr>

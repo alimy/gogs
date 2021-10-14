@@ -11,14 +11,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gogs/git-module"
 	"github.com/pkg/errors"
 	"github.com/unknwon/com"
 	"gopkg.in/ini.v1"
 	"gopkg.in/macaron.v1"
 	log "unknwon.dev/clog/v2"
-	"xorm.io/xorm"
-
-	"github.com/gogs/git-module"
 
 	"gogs.io/gogs/internal/conf"
 	"gogs.io/gogs/internal/context"
@@ -29,8 +27,8 @@ import (
 	"gogs.io/gogs/internal/markup"
 	"gogs.io/gogs/internal/osutil"
 	"gogs.io/gogs/internal/ssh"
+	"gogs.io/gogs/internal/strutil"
 	"gogs.io/gogs/internal/template/highlight"
-	"gogs.io/gogs/internal/tool"
 )
 
 const (
@@ -41,8 +39,9 @@ func checkRunMode() {
 	if conf.IsProdMode() {
 		macaron.Env = macaron.PROD
 		macaron.ColorLog = false
+		git.SetOutput(nil)
 	} else {
-		git.Debug = true
+		git.SetOutput(os.Stdout)
 	}
 	log.Info("Run mode: %s", strings.Title(macaron.Env))
 }
@@ -54,12 +53,12 @@ func GlobalInit(customConf string) error {
 		return errors.Wrap(err, "init configuration")
 	}
 
-	conf.InitLogging()
+	conf.InitLogging(false)
 	log.Info("%s %s", conf.App.BrandName, conf.App.Version)
 	log.Trace("Work directory: %s", conf.WorkDir())
 	log.Trace("Custom path: %s", conf.CustomDir())
 	log.Trace("Custom config: %s", conf.CustomConf)
-	log.Trace("Log path: %s", conf.LogRootPath)
+	log.Trace("Log path: %s", conf.Log.RootPath)
 	log.Trace("Build time: %s", conf.BuildTime)
 	log.Trace("Build commit: %s", conf.BuildCommit)
 
@@ -67,7 +66,6 @@ func GlobalInit(customConf string) error {
 		log.Trace("Email service is enabled")
 	}
 
-	conf.NewServices()
 	email.NewContext()
 
 	if conf.Security.InstallLock {
@@ -78,7 +76,6 @@ func GlobalInit(customConf string) error {
 		}
 		db.HasEngine = true
 
-		db.LoadAuthSources()
 		db.LoadRepoConfig()
 		db.NewRepoContext()
 
@@ -87,9 +84,6 @@ func GlobalInit(customConf string) error {
 		db.InitSyncMirrors()
 		db.InitDeliverHooks()
 		db.InitTestPullRequests()
-	}
-	if db.EnableSQLite3 {
-		log.Info("SQLite3 is supported")
 	}
 	if conf.HasMinWinSvc {
 		log.Info("Builtin Windows Service is supported")
@@ -104,9 +98,10 @@ func GlobalInit(customConf string) error {
 	}
 
 	if conf.SSH.StartBuiltinServer {
-		ssh.Listen(conf.SSH.ListenHost, conf.SSH.ListenPort, conf.SSH.ServerCiphers)
+		ssh.Listen(conf.SSH.ListenHost, conf.SSH.ListenPort, conf.SSH.ServerCiphers, conf.SSH.ServerMACs)
 		log.Info("SSH server started on %s:%v", conf.SSH.ListenHost, conf.SSH.ListenPort)
 		log.Trace("SSH server cipher list: %v", conf.SSH.ServerCiphers)
+		log.Trace("SSH server MAC list: %v", conf.SSH.ServerMACs)
 	}
 
 	if conf.SSH.RewriteAuthorizedKeysAtStart {
@@ -127,11 +122,7 @@ func InstallInit(c *context.Context) {
 	c.Title("install.install")
 	c.PageIs("Install")
 
-	dbOpts := []string{"MySQL", "PostgreSQL", "MSSQL"}
-	if db.EnableSQLite3 {
-		dbOpts = append(dbOpts, "SQLite3")
-	}
-	c.Data["DbOptions"] = dbOpts
+	c.Data["DbOptions"] = []string{"MySQL", "PostgreSQL", "SQLite3"}
 }
 
 func Install(c *context.Context) {
@@ -147,12 +138,8 @@ func Install(c *context.Context) {
 	switch conf.Database.Type {
 	case "mysql":
 		c.Data["CurDbOption"] = "MySQL"
-	case "mssql":
-		c.Data["CurDbOption"] = "MSSQL"
 	case "sqlite3":
-		if db.EnableSQLite3 {
-			c.Data["CurDbOption"] = "SQLite3"
-		}
+		c.Data["CurDbOption"] = "SQLite3"
 	}
 
 	// Application general settings
@@ -172,7 +159,7 @@ func Install(c *context.Context) {
 	f.UseBuiltinSSHServer = conf.SSH.StartBuiltinServer
 	f.HTTPPort = conf.Server.HTTPPort
 	f.AppUrl = conf.Server.ExternalURL
-	f.LogRootPath = conf.LogRootPath
+	f.LogRootPath = conf.Log.RootPath
 
 	// E-mail service settings
 	if conf.Email.Enabled {
@@ -185,8 +172,8 @@ func Install(c *context.Context) {
 
 	// Server and other services settings
 	f.OfflineMode = conf.Server.OfflineMode
-	f.DisableGravatar = conf.DisableGravatar
-	f.EnableFederatedAvatar = conf.EnableFederatedAvatar
+	f.DisableGravatar = conf.Picture.DisableGravatar
+	f.EnableFederatedAvatar = conf.Picture.EnableFederatedAvatar
 	f.DisableRegistration = conf.Auth.DisableRegistration
 	f.EnableCaptcha = conf.Auth.EnableRegistrationCaptcha
 	f.RequireSignInView = conf.Auth.RequireSigninView
@@ -222,7 +209,6 @@ func InstallPost(c *context.Context, f form.Install) {
 	dbTypes := map[string]string{
 		"PostgreSQL": "postgres",
 		"MySQL":      "mysql",
-		"MSSQL":      "mssql",
 		"SQLite3":    "sqlite3",
 	}
 	conf.Database.Type = dbTypes[f.DbType]
@@ -240,8 +226,7 @@ func InstallPost(c *context.Context, f form.Install) {
 	}
 
 	// Set test engine.
-	var x *xorm.Engine
-	if err := db.NewTestEngine(x); err != nil {
+	if err := db.NewTestEngine(); err != nil {
 		if strings.Contains(err.Error(), `Unknown database type: sqlite3`) {
 			c.FormErr("DbType")
 			c.RenderWithErr(c.Tr("install.sqlite3_not_available", "https://gogs.io/docs/installation/install_from_binary.html"), INSTALL, &f)
@@ -355,15 +340,14 @@ func InstallPost(c *context.Context, f form.Install) {
 	} else {
 		cfg.Section("mailer").Key("ENABLED").SetValue("false")
 	}
-	cfg.Section("service").Key("REGISTER_EMAIL_CONFIRM").SetValue(com.ToStr(f.RegisterConfirm))
-	cfg.Section("service").Key("ENABLE_NOTIFY_MAIL").SetValue(com.ToStr(f.MailNotify))
-
 	cfg.Section("server").Key("OFFLINE_MODE").SetValue(com.ToStr(f.OfflineMode))
+	cfg.Section("auth").Key("REQUIRE_EMAIL_CONFIRMATION").SetValue(com.ToStr(f.RegisterConfirm))
+	cfg.Section("auth").Key("DISABLE_REGISTRATION").SetValue(com.ToStr(f.DisableRegistration))
+	cfg.Section("auth").Key("ENABLE_REGISTRATION_CAPTCHA").SetValue(com.ToStr(f.EnableCaptcha))
+	cfg.Section("auth").Key("REQUIRE_SIGNIN_VIEW").SetValue(com.ToStr(f.RequireSignInView))
+	cfg.Section("user").Key("ENABLE_EMAIL_NOTIFICATION").SetValue(com.ToStr(f.MailNotify))
 	cfg.Section("picture").Key("DISABLE_GRAVATAR").SetValue(com.ToStr(f.DisableGravatar))
 	cfg.Section("picture").Key("ENABLE_FEDERATED_AVATAR").SetValue(com.ToStr(f.EnableFederatedAvatar))
-	cfg.Section("service").Key("DISABLE_REGISTRATION").SetValue(com.ToStr(f.DisableRegistration))
-	cfg.Section("service").Key("ENABLE_CAPTCHA").SetValue(com.ToStr(f.EnableCaptcha))
-	cfg.Section("service").Key("REQUIRE_SIGNIN_VIEW").SetValue(com.ToStr(f.RequireSignInView))
 
 	cfg.Section("").Key("RUN_MODE").SetValue("prod")
 
@@ -378,7 +362,7 @@ func InstallPost(c *context.Context, f form.Install) {
 	cfg.Section("log").Key("ROOT_PATH").SetValue(f.LogRootPath)
 
 	cfg.Section("security").Key("INSTALL_LOCK").SetValue("true")
-	secretKey, err := tool.RandomString(15)
+	secretKey, err := strutil.RandomChars(15)
 	if err != nil {
 		c.RenderWithErr(c.Tr("install.secret_key_failed", err), INSTALL, &f)
 		return
@@ -419,8 +403,8 @@ func InstallPost(c *context.Context, f form.Install) {
 		}
 
 		// Auto-login for admin
-		c.Session.Set("uid", u.ID)
-		c.Session.Set("uname", u.Name)
+		_ = c.Session.Set("uid", u.ID)
+		_ = c.Session.Set("uname", u.Name)
 	}
 
 	log.Info("First-time run install finished!")
