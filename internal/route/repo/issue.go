@@ -407,6 +407,8 @@ func NewIssuePost(c *context.Context, f form.NewIssue) {
 	c.Data["PageIsIssueList"] = true
 	c.Data["RequireHighlightJS"] = true
 	c.Data["RequireSimpleMDE"] = true
+	c.RequireMermaid()
+
 	renderAttachmentSettings(c)
 
 	labelIDs, milestoneID, assigneeID := ValidateRepoMetas(c, f)

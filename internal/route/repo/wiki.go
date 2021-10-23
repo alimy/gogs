@@ -184,6 +184,7 @@ func NewWiki(c *context.Context) {
 	c.Data["Title"] = c.Tr("repo.wiki.new_page")
 	c.Data["PageIsWiki"] = true
 	c.Data["RequireSimpleMDE"] = true
+	c.RequireMermaid()
 
 	if !c.Repo.Repository.HasWiki() {
 		c.Data["title"] = "Home"
@@ -196,6 +197,7 @@ func NewWikiPost(c *context.Context, f form.NewWiki) {
 	c.Data["Title"] = c.Tr("repo.wiki.new_page")
 	c.Data["PageIsWiki"] = true
 	c.Data["RequireSimpleMDE"] = true
+	c.RequireMermaid()
 
 	if c.HasError() {
 		c.Success(WIKI_NEW)
@@ -219,6 +221,7 @@ func EditWiki(c *context.Context) {
 	c.Data["PageIsWiki"] = true
 	c.Data["PageIsWikiEdit"] = true
 	c.Data["RequireSimpleMDE"] = true
+	c.RequireMermaid()
 
 	if !c.Repo.Repository.HasWiki() {
 		c.Redirect(c.Repo.RepoLink + "/wiki")
@@ -237,6 +240,7 @@ func EditWikiPost(c *context.Context, f form.NewWiki) {
 	c.Data["Title"] = c.Tr("repo.wiki.new_page")
 	c.Data["PageIsWiki"] = true
 	c.Data["RequireSimpleMDE"] = true
+	c.RequireMermaid()
 
 	if c.HasError() {
 		c.Success(WIKI_NEW)

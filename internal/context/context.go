@@ -71,6 +71,10 @@ func (c *Context) RequireSimpleMDE() {
 	c.Require("SimpleMDE")
 }
 
+func (c *Context) RequireMermaid() {
+	c.Require("Mermaid")
+}
+
 func (c *Context) RequireAutosize() {
 	c.Require("Autosize")
 }

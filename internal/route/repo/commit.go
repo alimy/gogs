@@ -112,6 +112,7 @@ func FileHistory(c *context.Context) {
 
 func Diff(c *context.Context) {
 	c.PageIs("Diff")
+	c.RequireMermaid()
 	c.RequireHighlightJS()
 
 	userName := c.Repo.Owner.Name

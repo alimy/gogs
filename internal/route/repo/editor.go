@@ -47,6 +47,7 @@ func getParentTreeFields(treePath string) (treeNames []string, treePaths []strin
 
 func editFile(c *context.Context, isNewFile bool) {
 	c.PageIs("Edit")
+	c.RequireMermaid()
 	c.RequireHighlightJS()
 	c.RequireSimpleMDE()
 	c.Data["IsNewFile"] = isNewFile
@@ -121,6 +122,7 @@ func NewFile(c *context.Context) {
 
 func editFilePost(c *context.Context, f form.EditRepoFile, isNewFile bool) {
 	c.PageIs("Edit")
+	c.RequireMermaid()
 	c.RequireHighlightJS()
 	c.RequireSimpleMDE()
 	c.Data["IsNewFile"] = isNewFile

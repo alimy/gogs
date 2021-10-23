@@ -245,6 +245,7 @@ func Home(c *context.Context) {
 		c.Data["Title"] = title + " @ " + c.Repo.BranchName
 	}
 	c.Data["RequireHighlightJS"] = true
+	c.RequireMermaid()
 
 	branchLink := c.Repo.RepoLink + "/src/" + c.Repo.BranchName
 	treeLink := branchLink
