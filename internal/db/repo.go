@@ -217,7 +217,7 @@ func (repo *Repository) AfterSet(colName string, _ xorm.Cell) {
 	switch colName {
 	case "default_branch":
 		// FIXME: use db migration to solve all at once.
-		if len(repo.DefaultBranch) == 0 {
+		if repo.DefaultBranch == "" {
 			repo.DefaultBranch = "master"
 		}
 	case "num_closed_issues":
@@ -227,8 +227,8 @@ func (repo *Repository) AfterSet(colName string, _ xorm.Cell) {
 	case "num_closed_milestones":
 		repo.NumOpenMilestones = repo.NumMilestones - repo.NumClosedMilestones
 	case "external_tracker_style":
-		if len(repo.ExternalTrackerStyle) == 0 {
-			repo.ExternalTrackerStyle = markup.ISSUE_NAME_STYLE_NUMERIC
+		if repo.ExternalTrackerStyle == "" {
+			repo.ExternalTrackerStyle = markup.IssueNameStyleNumeric
 		}
 	case "created_unix":
 		repo.Created = time.Unix(repo.CreatedUnix, 0).Local()
@@ -445,10 +445,10 @@ func (repo *Repository) ComposeMetas() map[string]string {
 		repo.ExternalMetas["format"] = repo.ExternalTrackerFormat
 
 		switch repo.ExternalTrackerStyle {
-		case markup.ISSUE_NAME_STYLE_ALPHANUMERIC:
-			repo.ExternalMetas["style"] = markup.ISSUE_NAME_STYLE_ALPHANUMERIC
+		case markup.IssueNameStyleAlphanumeric:
+			repo.ExternalMetas["style"] = markup.IssueNameStyleAlphanumeric
 		default:
-			repo.ExternalMetas["style"] = markup.ISSUE_NAME_STYLE_NUMERIC
+			repo.ExternalMetas["style"] = markup.IssueNameStyleNumeric
 		}
 	}
 
@@ -1746,7 +1746,7 @@ func GetUserAndCollaborativeRepositories(userID int64) ([]*Repository, error) {
 	return append(repos, ownRepos...), nil
 }
 
-func getRepositoryCount(e Engine, u *User) (int64, error) {
+func getRepositoryCount(_ Engine, u *User) (int64, error) {
 	return x.Count(&Repository{OwnerID: u.ID})
 }
 

@@ -27,16 +27,16 @@ type mockStorage struct {
 	buf *bytes.Buffer
 }
 
-func (s *mockStorage) Storage() lfsutil.Storage {
+func (*mockStorage) Storage() lfsutil.Storage {
 	return "memory"
 }
 
-func (s *mockStorage) Upload(oid lfsutil.OID, rc io.ReadCloser) (int64, error) {
+func (s *mockStorage) Upload(_ lfsutil.OID, rc io.ReadCloser) (int64, error) {
 	defer rc.Close()
 	return io.Copy(s.buf, rc)
 }
 
-func (s *mockStorage) Download(oid lfsutil.OID, w io.Writer) error {
+func (s *mockStorage) Download(_ lfsutil.OID, w io.Writer) error {
 	_, err := io.Copy(w, s.buf)
 	return err
 }

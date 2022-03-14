@@ -59,7 +59,7 @@ func (u *User) BeforeCreate(tx *gorm.DB) error {
 }
 
 // NOTE: This is a GORM query hook.
-func (u *User) AfterFind(tx *gorm.DB) error {
+func (u *User) AfterFind(_ *gorm.DB) error {
 	u.Created = time.Unix(u.CreatedUnix, 0).Local()
 	u.Updated = time.Unix(u.UpdatedUnix, 0).Local()
 	return nil
@@ -278,7 +278,7 @@ func (ErrUserNotExist) NotFound() bool {
 func (db *users) GetByEmail(email string) (*User, error) {
 	email = strings.ToLower(email)
 
-	if len(email) == 0 {
+	if email == "" {
 		return nil, ErrUserNotExist{args: errutil.Args{"email": email}}
 	}
 

@@ -33,7 +33,7 @@ func ToWikiPageURL(name string) string {
 // that are not belong to wiki repository.
 func ToWikiPageName(urlString string) string {
 	name, _ := url.QueryUnescape(urlString)
-	return strings.Replace(strings.TrimLeft(path.Clean("/"+name), "/"), "/", " ", -1)
+	return strings.ReplaceAll(strings.TrimLeft(path.Clean("/"+name), "/"), "/", " ")
 }
 
 // WikiCloneLink returns clone URLs of repository wiki.
@@ -122,7 +122,7 @@ func (repo *Repository) updateWikiPage(doer *User, oldTitle, title, content, mes
 		return fmt.Errorf("WriteFile: %v", err)
 	}
 
-	if len(message) == 0 {
+	if message == "" {
 		message = "Update page '" + title + "'"
 	}
 	if err = git.RepoAdd(localPath, git.AddOptions{All: true}); err != nil {

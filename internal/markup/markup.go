@@ -29,8 +29,8 @@ func IsIPythonNotebook(name string) bool {
 }
 
 const (
-	ISSUE_NAME_STYLE_NUMERIC      = "numeric"
-	ISSUE_NAME_STYLE_ALPHANUMERIC = "alphanumeric"
+	IssueNameStyleNumeric      = "numeric"
+	IssueNameStyleAlphanumeric = "alphanumeric"
 )
 
 var (
@@ -70,7 +70,7 @@ func FindAllMentions(content string) []string {
 // cutoutVerbosePrefix cutouts URL prefix including sub-path to
 // return a clean unified string of request URL path.
 func cutoutVerbosePrefix(prefix string) string {
-	if len(prefix) == 0 || prefix[0] != '/' {
+	if prefix == "" || prefix[0] != '/' {
 		return prefix
 	}
 	count := 0
@@ -90,7 +90,7 @@ func RenderIssueIndexPattern(rawBytes []byte, urlPrefix string, metas map[string
 	urlPrefix = cutoutVerbosePrefix(urlPrefix)
 
 	pattern := IssueNumericPattern
-	if metas["style"] == ISSUE_NAME_STYLE_ALPHANUMERIC {
+	if metas["style"] == IssueNameStyleAlphanumeric {
 		pattern = IssueAlphanumericPattern
 	}
 
@@ -101,11 +101,11 @@ func RenderIssueIndexPattern(rawBytes []byte, urlPrefix string, metas map[string
 			m = m[1:]
 		}
 		var link string
-		if metas == nil {
+		if metas == nil || metas["format"] == "" {
 			link = fmt.Sprintf(`<a href="%s/issues/%s">%s</a>`, urlPrefix, m[1:], m)
 		} else {
 			// Support for external issue tracker
-			if metas["style"] == ISSUE_NAME_STYLE_ALPHANUMERIC {
+			if metas["style"] == IssueNameStyleAlphanumeric {
 				metas["index"] = string(m)
 			} else {
 				metas["index"] = string(m[1:])
@@ -122,7 +122,7 @@ func RenderIssueIndexPattern(rawBytes []byte, urlPrefix string, metas map[string
 var pound = []byte("#")
 
 // RenderCrossReferenceIssueIndexPattern renders issue indexes from other repositories to corresponding links.
-func RenderCrossReferenceIssueIndexPattern(rawBytes []byte, urlPrefix string, metas map[string]string) []byte {
+func RenderCrossReferenceIssueIndexPattern(rawBytes []byte, _ string, _ map[string]string) []byte {
 	ms := CrossReferenceIssueNumericPattern.FindAll(rawBytes, -1)
 	for _, m := range ms {
 		if m[0] == ' ' || m[0] == '(' {
@@ -141,7 +141,7 @@ func RenderCrossReferenceIssueIndexPattern(rawBytes []byte, urlPrefix string, me
 
 // RenderSha1CurrentPattern renders SHA1 strings to corresponding links that assumes in the same repository.
 func RenderSha1CurrentPattern(rawBytes []byte, urlPrefix string) []byte {
-	return []byte(Sha1CurrentPattern.ReplaceAllStringFunc(string(rawBytes[:]), func(m string) string {
+	return []byte(Sha1CurrentPattern.ReplaceAllStringFunc(string(rawBytes), func(m string) string {
 		if com.StrTo(m).MustInt() > 0 {
 			return m
 		}
@@ -155,8 +155,7 @@ func RenderSpecialLink(rawBytes []byte, urlPrefix string, metas map[string]strin
 	ms := MentionPattern.FindAll(rawBytes, -1)
 	for _, m := range ms {
 		m = m[bytes.Index(m, []byte("@")):]
-		rawBytes = bytes.Replace(rawBytes, m,
-			[]byte(fmt.Sprintf(`<a href="%s/%s">%s</a>`, conf.Server.Subpath, m[1:], m)), -1)
+		rawBytes = bytes.ReplaceAll(rawBytes, m, []byte(fmt.Sprintf(`<a href="%s/%s">%s</a>`, conf.Server.Subpath, m[1:], m)))
 	}
 
 	rawBytes = RenderIssueIndexPattern(rawBytes, urlPrefix, metas)
@@ -186,7 +185,7 @@ func wrapImgWithLink(urlPrefix string, buf *bytes.Buffer, token html.Token) {
 	}
 
 	// Skip in case the "src" is empty
-	if len(src) == 0 {
+	if src == "" {
 		buf.WriteString(token.String())
 		return
 	}
@@ -216,7 +215,7 @@ func wrapImgWithLink(urlPrefix string, buf *bytes.Buffer, token html.Token) {
 	buf.WriteString(`">`)
 
 	if needPrepend {
-		src = strings.Replace(urlPrefix+src, " ", "%20", -1)
+		src = strings.ReplaceAll(urlPrefix+src, " ", "%20")
 		buf.WriteString(`<img src="`)
 		buf.WriteString(src)
 		buf.WriteString(`"`)
@@ -243,7 +242,7 @@ func postProcessHTML(rawHTML []byte, urlPrefix string, metas map[string]string) 
 	buf := bytes.NewBuffer(nil)
 	tokenizer := html.NewTokenizer(bytes.NewReader(rawHTML))
 
-OUTER_LOOP:
+outerLoop:
 	for html.ErrorToken != tokenizer.Next() {
 		token := tokenizer.Token()
 		switch token.Type {
@@ -255,7 +254,7 @@ OUTER_LOOP:
 
 			if tagName == "img" {
 				wrapImgWithLink(urlPrefix, buf, token)
-				continue OUTER_LOOP
+				continue outerLoop
 			}
 
 			buf.WriteString(token.String())
@@ -268,7 +267,7 @@ OUTER_LOOP:
 					// Copy the token to the output verbatim
 					buf.WriteString(token.String())
 
-					// Stack number doesn't increate for tags without end tags.
+					// Stack number doesn't increase for tags without end tags.
 					if token.Type == html.StartTagToken && !com.IsSliceContainsStr(noEndTags, token.Data) {
 						stackNum++
 					}
@@ -281,7 +280,7 @@ OUTER_LOOP:
 						}
 					}
 				}
-				continue OUTER_LOOP
+				continue outerLoop
 			}
 
 			if !com.IsSliceContainsStr(noEndTags, tagName) {
@@ -315,23 +314,23 @@ OUTER_LOOP:
 type Type string
 
 const (
-	UNRECOGNIZED     Type = "unrecognized"
-	MARKDOWN         Type = "markdown"
-	ORG_MODE         Type = "orgmode"
-	IPYTHON_NOTEBOOK Type = "ipynb"
+	TypeUnrecognized    Type = "unrecognized"
+	TypeMarkdown        Type = "markdown"
+	TypeOrgMode         Type = "orgmode"
+	TypeIPythonNotebook Type = "ipynb"
 )
 
 // Detect returns best guess of a markup type based on file name.
 func Detect(filename string) Type {
 	switch {
 	case IsMarkdownFile(filename):
-		return MARKDOWN
+		return TypeMarkdown
 	case IsOrgModeFile(filename):
-		return ORG_MODE
+		return TypeOrgMode
 	case IsIPythonNotebook(filename):
-		return IPYTHON_NOTEBOOK
+		return TypeIPythonNotebook
 	default:
-		return UNRECOGNIZED
+		return TypeUnrecognized
 	}
 }
 
@@ -347,12 +346,12 @@ func Render(typ Type, input interface{}, urlPrefix string, metas map[string]stri
 		panic(fmt.Sprintf("unrecognized input content type: %T", input))
 	}
 
-	urlPrefix = strings.TrimRight(strings.Replace(urlPrefix, " ", "%20", -1), "/")
+	urlPrefix = strings.TrimRight(strings.ReplaceAll(urlPrefix, " ", "%20"), "/")
 	var rawHTML []byte
 	switch typ {
-	case MARKDOWN:
+	case TypeMarkdown:
 		rawHTML = RawMarkdown(rawBytes, urlPrefix)
-	case ORG_MODE:
+	case TypeOrgMode:
 		rawHTML = RawOrgMode(rawBytes, urlPrefix)
 	default:
 		return rawBytes // Do nothing if syntax type is not recognized
